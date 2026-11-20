@@ -1,0 +1,22 @@
+/**
+ * 全站基础外观：页面背景、正文排版与键盘焦点。
+ */
+
+body {
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 1.4rem;
+  line-height: 1.6;
+}
+
+:focus-visible {
+  outline: 0.2rem solid var(--accent);
+  outline-offset: 0.2rem;
+}
+
+.thin-bar { // 窄滚动条
+    scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0);
+    scrollbar-width: thin;
+}

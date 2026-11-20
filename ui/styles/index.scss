@@ -1,0 +1,8 @@
+/**
+ * 全局样式入口：按层聚合，不在这里写具体规则。
+ * 组件自己的外观仍写在各 SFC 的 <style scoped lang="scss"> 里。
+ */
+
+@use 'var';
+@use 'reset';
+@use 'global';

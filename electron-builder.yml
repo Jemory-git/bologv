@@ -1,0 +1,16 @@
+appId: dev.bologui.app
+productName: bologui
+directories:
+  output: dist-pkg
+files:
+  - dist/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: bologui-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

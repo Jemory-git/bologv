@@ -1,0 +1,48 @@
+{
+  "name": "bologui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "基于简化 Cordis 内核的 agent 开发基础：Electron 外壳 + Koa 提供的 Web UI",
+  "author": "bologui",
+  "type": "module",
+  "main": "dist/main.mjs",
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p electron/tsconfig.json && vue-tsc -p ui/tsconfig.json",
+    "build:electron": "cross-env NODE_ENV=production tsx scripts/build-electron.ts",
+    "electron": "npm run build:electron && cross-env NODE_ENV=production electron .",
+    "electron:dev": "cross-env NODE_ENV=development tsx scripts/dev.ts",
+    "electron:pack": "npm run build:electron && cross-env NODE_ENV=production electron-builder --win --dir --publish never",
+    "electron:installer": "npm run build:electron && cross-env NODE_ENV=production electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "@iconify-json/icon-park-outline": "^1.2.4",
+    "@iconify/vue": "^5.0.5",
+    "@types/koa": "^3.0.3",
+    "@types/koa__router": "^12.0.5",
+    "@types/koa-bodyparser": "^4.3.13",
+    "@types/koa-static": "^4.0.4",
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "cross-env": "^10.1.0",
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.25.12",
+    "pinia": "^4.1.0",
+    "sass": "^1.108.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "unplugin-icons": "^24.0.0",
+    "vite": "^7.3.8",
+    "vue": "^3.5.45",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "@koa/router": "^15.7.1",
+    "koa": "^3.3.0",
+    "koa-bodyparser": "^4.4.1",
+    "koa-static": "^5.0.0"
+  }
+}

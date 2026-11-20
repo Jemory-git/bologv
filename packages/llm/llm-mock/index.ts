@@ -1,0 +1,46 @@
+/**
+ * 一个 Provider 实现：规则驱动的假模型。
+ * 对应真实仓库 packages/llm/llm-deepseek（那里换成 HTTP 流式请求）。
+ *
+ * 它演示的重点是：provider 只依赖 Service Definition，不认识 agent-loop。
+ */
+
+import { randomUUID } from 'node:crypto'
+import type { Plugin } from '@pkg/cordis'
+import { LLM_SERVICE_NAME, type LLMService } from '@pkg/llm'
+
+export const mockLLM: Plugin = {
+  name: 'mock-llm',
+  apply(ctx) {
+    const service: LLMService = {
+      async chat(request) {
+        const last = request.messages.at(-1)
+        const hasTool = (name: string) => request.tools.some((tool) => tool.name === name)
+
+        // 上一轮是工具结果：模型「读到结果」后给出最终回答。
+        if (last?.role === 'tool') {
+          return { kind: 'text', text: `工具 ${last.toolName} 返回：${last.content}` }
+        }
+
+        const userText =
+          [...request.messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+
+        const readMatch = /(?:读取|打开|read)\s*([^\s，。]+)/i.exec(userText)
+        if (readMatch !== null && hasTool('read_file')) {
+          return {
+            kind: 'tool_calls',
+            calls: [{ id: randomUUID(), name: 'read_file', args: { path: readMatch[1] } }],
+          }
+        }
+
+        if (/(时间|几点|time|date)/i.test(userText) && hasTool('now')) {
+          return { kind: 'tool_calls', calls: [{ id: randomUUID(), name: 'now', args: {} }] }
+        }
+
+        return { kind: 'text', text: `（mock 回声）你说：${userText}` }
+      },
+    }
+
+    ctx.provide<LLMService>(LLM_SERVICE_NAME, service)
+  },
+}
