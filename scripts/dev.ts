@@ -53,9 +53,12 @@ function startElectron(): void {
   })
   electronProc.on('exit', (code) => {
     electronProc = undefined
+    // 重启流程会提前移除该监听；走到这里代表 Electron 自行退出，CLI 应一并结束。
+    if (!uiReady) return
     if (code !== null && code !== 0) {
       console.log(`[electron] exited with code ${code}`)
     }
+    void shutdown().finally(() => process.exit(code ?? 0))
   })
 }
 

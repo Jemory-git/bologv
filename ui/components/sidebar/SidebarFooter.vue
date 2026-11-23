@@ -1,51 +1,54 @@
 <script setup lang="ts">
-/**
- * 侧边栏底部：设置按钮 + 弹出面板。
- *
- * 面板目前包含两个入口，点击后切换到对应配置视图（待实现）。
- * 弹出层用纯 CSS 定位，点击外部自动关闭。
- */
-import { onMounted, onUnmounted, ref } from 'vue'
-import IconSettings from '~icons/icon-park-outline/config'
+  /**
+   * 侧边栏底部：设置按钮 + 弹出面板。
+   *
+   * 面板目前包含两个入口，点击后切换到对应配置视图（待实现）。
+   * 弹出层用纯 CSS 定位，点击外部自动关闭。
+   */
+  import { onMounted, onUnmounted, ref } from 'vue'
+  import IconSettings from '~icons/icon-park-outline/config'
+  import ExclusiveSlotOutlet from '@ui/components/slots/ExclusiveSlotOutlet.vue'
+  import { adPositionSlot } from '@ui/slots'
 
-const popoverRef = ref<HTMLElement | null>(null)
-const open = ref(false)
+  const popoverRef = ref<HTMLElement | null>(null)
+  const open = ref(false)
 
-function toggle(): void {
-  open.value = !open.value
-}
-
-function onDocumentClick(e: MouseEvent): void {
-  if (!open.value) return
-  if (popoverRef.value && !popoverRef.value.contains(e.target as Node)) {
-    open.value = false
+  function toggle(): void {
+    open.value = !open.value
   }
-}
 
-onMounted(() => {
-  document.addEventListener('click', onDocumentClick)
-})
-onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
-})
+  function onDocumentClick(e: MouseEvent): void {
+    if (!open.value) return
+    if (popoverRef.value && !popoverRef.value.contains(e.target as Node)) {
+      open.value = false
+    }
+  }
 
-const emit = defineEmits<{
-  (e: 'open-model'): void
-}>()
+  onMounted(() => {
+    document.addEventListener('click', onDocumentClick)
+  })
+  onUnmounted(() => {
+    document.removeEventListener('click', onDocumentClick)
+  })
 
-function handleItem(name: string): void {
-  open.value = false
-  if (name === 'model') emit('open-model')
-  // TODO: system prompt 配置
-}
+  const emit = defineEmits<{
+    (e: 'open-model'): void
+  }>()
+
+  function handleItem(name: string): void {
+    open.value = false
+    if (name === 'model') emit('open-model')
+    // TODO: system prompt 配置
+  }
 </script>
 
 <template>
   <div ref="popoverRef" class="sidebar-footer">
-    <button type="button" class="settings-btn" :class="{ active: open }" aria-label="设置" :aria-expanded="open"
-      aria-controls="settings-popover" @click="toggle">
+    <button type="button" class="settings-btn" :class="{ active: open }" aria-label="设置" :aria-expanded="open" aria-controls="settings-popover" @click="toggle">
       <IconSettings :size="16" />
     </button>
+
+    <ExclusiveSlotOutlet :slot="adPositionSlot" />
 
     <div v-if="open" id="settings-popover" class="popover" role="menu">
       <button type="button" class="item" role="menuitem" @click="handleItem('model')">
@@ -62,7 +65,7 @@ function handleItem(name: string): void {
 .sidebar-footer {
   position: relative;
   padding: 0.8rem 1.2rem 1.2rem;
-  border-top: 0.1rem solid var(--line);
+  // border-top: 0.1rem solid var(--line);
 }
 
 .settings-btn {

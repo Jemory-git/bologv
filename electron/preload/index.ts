@@ -10,9 +10,20 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../types/ipc.ts'
 
+import type { WindowControlAction } from '../types/ipc.ts'
+
 contextBridge.exposeInMainWorld('bologui', {
   // boot 信息：插件列表、会话路径、工作目录
   boot: () => ipcRenderer.invoke(IPC.boot),
+
+  // 当前窗口控制与状态同步
+  windowControl: (action: WindowControlAction) => ipcRenderer.invoke(IPC.windowControl, action),
+  isWindowMaximized: () => ipcRenderer.invoke(IPC.windowIsMaximized),
+  onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => {
+    const listener = (_event: unknown, isMaximized: boolean) => callback(isMaximized)
+    ipcRenderer.on(IPC.windowMaximizedChanged, listener)
+    return () => ipcRenderer.removeListener(IPC.windowMaximizedChanged, listener)
+  },
 
   onReady: (callback: (name: string) => void) => {
     const listener = (_event: unknown, payload: string) => callback(payload)
@@ -23,5 +34,10 @@ contextBridge.exposeInMainWorld('bologui', {
     const listener = (_event: unknown, payload: unknown) => callback(payload)
     ipcRenderer.on(IPC.event, listener)
     return () => ipcRenderer.removeListener(IPC.event, listener)
+  },
+  onPluginsChanged: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on(IPC.pluginsChanged, listener)
+    return () => ipcRenderer.removeListener(IPC.pluginsChanged, listener)
   },
 })

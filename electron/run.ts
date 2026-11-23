@@ -13,6 +13,7 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { createWindow, broadcast } from './main/window.ts'
 import { registerIpc } from './main/ipc.ts'
+import { watchPluginSources } from './main/plugins-watch.ts'
 import { teardown, type Booted } from '../boot.ts'
 import { IPC } from './types/ipc.ts'
 import type { Server } from 'node:http'
@@ -32,6 +33,11 @@ export function run(options: RunOptions): void {
     options.booted.root.on('plugin/ready', (name) => broadcast(IPC.ready, String(name)))
     options.booted.root.on('session/event', (event) => broadcast(IPC.event, event))
 
+    // 开发模式：插件源码变动 → 通知渲染进程自动重扫并重载
+    const stopWatching = process.env.NODE_ENV === 'production'
+      ? undefined
+      : watchPluginSources(() => broadcast(IPC.pluginsChanged, Date.now()))
+
     const uiUrl = options.getUiUrl()
     createWindow({ uiUrl, preloadPath: options.preloadPath })
 
@@ -42,6 +48,9 @@ export function run(options: RunOptions): void {
     })
 
     app.on('window-all-closed', () => {
+      console.log('window-all-closed');
+      
+      stopWatching?.()
       void teardown().finally(() => {
         app.quit()
         // keep-alive 连接会拖住 close()；先断开全部连接再关闭。

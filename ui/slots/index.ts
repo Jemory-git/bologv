@@ -4,17 +4,30 @@
  * 使用方式：插件/组件直接从子模块 import 具体实例，
  * 不经过 Registry 间接派发。见各子文件注释。
  *
- *   import { sidebarPanels } from '@ui/slots/pair/sidebar-panels.ts'
- *   import { appHeaderActions } from '@ui/slots/list/app-header-actions.ts'
+ *   import { sidebarPanels } from '@ui/slots'
+ *   import { appHeaderLeft, appHeaderRight } from '@ui/slots'
  */
 
 // 类型 + 基类
-export type { PairEntry, SlotEntry } from './types.ts'
-export { ListSlot, PairSlot, SingleSlot } from './slots.ts'
+export type {
+  PairEntry,
+  SlotAccess,
+  SlotDescriptor,
+  SlotEntry,
+  SlotKind,
+  SlotMeta,
+  SlotMetaInput,
+} from './types.ts'
+export { ListSlot, PairSlot, ExclusiveSlot, SlotBase } from './slots.ts'
+
+// 插槽清单（插件页读取）
+export { SLOT_CATALOG } from './catalog.ts'
+
+// exclusive 插槽实例
+export { adPositionSlot } from './exclusive/ad-position.ts'
 
 // List 插槽实例
-export { appHeaderActions } from './list/app-header-actions.ts'
-export type { AppHeaderActionsProps } from './list/app-header-actions.ts'
+export { appHeaderLeft, appHeaderRight } from './list/app-header.ts'
 export { chatHeaderActions } from './list/chat-header-actions.ts'
 export type { ChatHeaderActionsProps } from './list/chat-header-actions.ts'
 export { chatComposerActions } from './list/chat-composer-actions.ts'

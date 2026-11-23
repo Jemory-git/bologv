@@ -1,58 +1,58 @@
 <script setup lang="ts">
-/**
- * 对话记录：唯一滚动容器，把事件行映射成消息、工具卡片或系统提示。
- */
-import { computed, nextTick, ref, watch } from 'vue'
-import type { SessionEvent } from '@pkg/session'
-import type { ChatEntry } from '@ui/types/view-model.ts'
-import Empty from './empty.vue'
-import MessageItem from './MessageItem.vue'
-import SystemNotice from './SystemNotice.vue'
-import ToolCallCard from './ToolCallCard.vue'
-import TurnStatus from './TurnStatus.vue'
+  /**
+   * 对话记录：唯一滚动容器，把事件行映射成消息、工具卡片或系统提示。
+   */
+  import { computed, nextTick, ref, watch } from 'vue'
+  import type { SessionEvent } from '@pkg/session'
+  import type { ChatEntry } from '@ui/types/view-model.ts'
+  import Empty from './empty.vue'
+  import MessageItem from './MessageItem.vue'
+  import SystemNotice from './SystemNotice.vue'
+  import ToolCallCard from './ToolCallCard.vue'
+  import TurnStatus from './TurnStatus.vue'
 
-type ToolEvent = Extract<SessionEvent, { type: 'tool/call' | 'tool/result' }>
+  type ToolEvent = Extract<SessionEvent, { type: 'tool/call' | 'tool/result' }>
 
-type Row =
-  | { kind: 'notice'; text: string; tone?: 'notice' | 'error' }
-  | { kind: 'message'; role: 'user' | 'assistant'; text: string }
-  | { kind: 'tool'; event: ToolEvent }
+  type Row =
+    | { kind: 'notice'; text: string; tone?: 'notice' | 'error' }
+    | { kind: 'message'; role: 'user' | 'assistant'; text: string }
+    | { kind: 'tool'; event: ToolEvent }
 
-const props = defineProps<{ entries: readonly ChatEntry[]; pending: boolean }>()
+  const props = defineProps<{ entries: readonly ChatEntry[]; pending: boolean }>()
 
-const emit = defineEmits<{ suggest: [text: string] }>()
+  const emit = defineEmits<{ suggest: [text: string] }>()
 
-function toRow(entry: ChatEntry): Row {
-  if (entry.kind !== 'event') {
-    return { kind: 'notice', text: entry.text, tone: entry.kind === 'error' ? 'error' : 'notice' }
+  function toRow(entry: ChatEntry): Row {
+    if (entry.kind !== 'event') {
+      return { kind: 'notice', text: entry.text, tone: entry.kind === 'error' ? 'error' : 'notice' }
+    }
+
+    const event = entry.event
+    switch (event.type) {
+      case 'user/message':
+        return { kind: 'message', role: 'user', text: event.text }
+      case 'assistant/message':
+        return { kind: 'message', role: 'assistant', text: event.text }
+      case 'tool/call':
+      case 'tool/result':
+        return { kind: 'tool', event }
+    }
   }
 
-  const event = entry.event
-  switch (event.type) {
-    case 'user/message':
-      return { kind: 'message', role: 'user', text: event.text }
-    case 'assistant/message':
-      return { kind: 'message', role: 'assistant', text: event.text }
-    case 'tool/call':
-    case 'tool/result':
-      return { kind: 'tool', event }
+  const rows = computed<Row[]>(() => props.entries.map(toRow))
+  const list = ref<HTMLElement | null>(null)
+
+  function scrollToEnd(): void {
+    const element = list.value
+    if (element !== null) element.scrollTop = element.scrollHeight
   }
-}
 
-const rows = computed<Row[]>(() => props.entries.map(toRow))
-const list = ref<HTMLElement | null>(null)
-
-function scrollToEnd(): void {
-  const element = list.value
-  if (element !== null) element.scrollTop = element.scrollHeight
-}
-
-watch(
-  () => [props.entries.length, props.pending] as const,
-  () => {
-    void nextTick(scrollToEnd)
-  },
-)
+  watch(
+    () => [props.entries.length, props.pending] as const,
+    () => {
+      void nextTick(scrollToEnd)
+    },
+  )
 </script>
 
 <template>
@@ -69,6 +69,7 @@ watch(
 
 <style scoped lang="scss">
 .transcript {
+  width: 70%;
   display: flex;
   flex: 1;
   flex-direction: column;

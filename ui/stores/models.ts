@@ -22,12 +22,14 @@ export const useModelsStore = defineStore('models', () => {
     const [err, body] = await getVendors()
     if (err) return `加载失败：${err.message}`
     if (body.code !== 0) return `加载失败：${body.msg || 'api error'}`
+
     vendors.value = body.data ?? []
     // 选中模型仍在最新配置里则保留，否则回退到第一个可用模型。
     const models = vendors.value.flatMap((v) => v.models)
     if (!models.some((m) => m.modelId === selectedModelId.value)) {
       selectedModelId.value = models[0]?.modelId ?? null
     }
+
     return null
   }
 

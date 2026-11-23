@@ -6,11 +6,16 @@
  */
 
 import { BrowserWindow } from 'electron'
+import { IPC } from '../types/ipc.ts'
 
 export function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(channel, payload)
   }
+}
+
+function sendMaximized(win: BrowserWindow): void {
+  win.webContents.send(IPC.windowMaximizedChanged, win.isMaximized())
 }
 
 export interface CreateWindowOptions {
@@ -35,6 +40,9 @@ export function createWindow(options: CreateWindowOptions): BrowserWindow {
       sandbox: false,
     },
   })
+
+  mainWindow.on('maximize', () => sendMaximized(mainWindow))
+  mainWindow.on('unmaximize', () => sendMaximized(mainWindow))
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

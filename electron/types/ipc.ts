@@ -11,6 +11,10 @@ export const IPC = {
   boot: 'blg:boot',
   ready: 'blg:ready',
   event: 'blg:event',
+  pluginsChanged: 'blg:plugins-changed',
+  windowControl: 'blg:window-control',
+  windowIsMaximized: 'blg:window-is-maximized',
+  windowMaximizedChanged: 'blg:window-maximized-changed',
 } as const
 
 // Boot 通道
@@ -20,5 +24,9 @@ export interface BootResponse {
   workingDir: string
 }
 
+// Window 通道
+export type WindowControlAction = 'minimize' | 'toggle-maximize' | 'close'
+
 // Ready 通道 — payload 是插件名字符串
 // Event 通道 — payload 是 SessionEvent
+// PluginsChanged 通道 — payload 是发生变化的时间戳，仅作重载信号

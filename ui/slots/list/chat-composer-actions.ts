@@ -8,6 +8,10 @@ export interface ChatComposerActionsProps {
   pending: boolean
 }
 
-export const chatComposerActions = new ListSlot<ChatComposerActionsProps>(
-  'chat.composer.actions',
-)
+export const chatComposerActions = new ListSlot<ChatComposerActionsProps>({
+  id: 'chat.composer.actions',
+  label: '输入框动作',
+  description: '输入框左侧，放快捷输入类按钮（上传、粘贴、模板……）。',
+  access: 'builtin-only',
+  usage: "import { chatComposerActions } from '@ui/slots'",
+})

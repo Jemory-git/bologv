@@ -1,57 +1,58 @@
 <script setup lang="ts">
 /**
- * 插件页：显示完整清单（固定 + 可切换），可切换的提供启停开关。
- *
- * 固定插件 = 基础架构（渲染器、连接层、设置页……），在 main.ts 直接 use，
- * registry 只标记它们 active 不插手加载/卸载。
- * 可切换插件 = 由 registry 按 localStorage / defaultEnabled 启停。
+ * 插件页：按「内置 / 外置 / 开发者」三个视图切换显示。
+ * 头部只呈现整体装配状态；各视图的内容与交互在对应 Tab 组件里。
  */
-import { shallowReactive } from 'vue'
-import { PLUGIN_REGISTRY_SERVICE, type PluginRegistryService } from '@ui/plugins/core/plugin-registry.ts'
+import type { PluginRegistryService } from '@ui/plugins/core/plugin-registry.ts'
+import { computed, ref } from 'vue'
+import { PLUGIN_REGISTRY_SERVICE } from '@ui/plugins/core/plugin-registry.ts'
 import { useService } from '@ui/use/ctx-service.ts'
+import BuiltinTab from './BuiltinTab.vue'
+import DeveloperTab from './DeveloperTab.vue'
+import ExternalTab from './ExternalTab.vue'
+
+//states
+type TabId = 'builtin' | 'external' | 'developer'
 
 const registry = useService<PluginRegistryService>(PLUGIN_REGISTRY_SERVICE)
+const activeTab = ref<TabId>('external')
 
-const toggling = shallowReactive(new Set<string>())
+const builtinCount = computed(() => registry.all.filter((meta) => meta.origin === 'builtin').length)
+const externalCount = computed(() => registry.all.filter((meta) => meta.origin === 'external').length)
 
-async function handleToggle(id: string): Promise<void> {
-  if (toggling.has(id)) return
-  toggling.add(id)
-  try {
-    await registry.toggle(id)
-  } finally {
-    toggling.delete(id)
-  }
-}
+const tabs = computed<{ id: TabId; label: string; count?: number }[]>(() => [
+  { id: 'external', label: '外置插件', count: externalCount.value },
+  { id: 'builtin', label: '内置插件', count: builtinCount.value },
+  { id: 'developer', label: '开发者' },
+])
 </script>
 
 <template>
   <section class="panel-page">
-    <header class="page-header">
-      <h1>插件</h1>
-      <span class="count">{{ registry.activeIds.size }} / {{ registry.all.length }}</span>
+    <header class="masthead">
+      <div class="identity">
+        <h1>插件</h1>
+        <p class="lede">内置插件随应用编译；外置插件从用户目录运行时加载，启停即插即拔。</p>
+      </div>
+      <div class="stats">
+        <span class="stat-value">{{ registry.activeIds.size }}<i>/</i>{{ registry.all.length }}</span>
+        <span class="stat-label">已启用 / 总数</span>
+      </div>
     </header>
-    <p class="lede">启用的插件会向侧边栏和主区域注册入口；停用后自动移除所有视图和监听。</p>
-    <ul class="plugin-list">
-      <li v-for="meta in registry.all" :key="meta.id" class="plugin-item">
-        <div class="plugin-info">
-          <div class="plugin-label">
-            {{ meta.label }}
-            <span v-if="meta.fixed" class="tag tag-fixed">固定</span>
-          </div>
-          <div v-if="meta.description" class="plugin-desc">{{ meta.description }}</div>
-          <div class="plugin-id">{{ meta.id }}</div>
-        </div>
-        <!-- 可切换插件：显示启停开关 -->
-        <button v-if="!meta.fixed" type="button" class="toggle"
-          :class="{ 'toggle-on': registry.isEnabled(meta.id), 'toggle-off': !registry.isEnabled(meta.id) }"
-          :disabled="toggling.has(meta.id)" @click="handleToggle(meta.id)">
-          <template v-if="toggling.has(meta.id)">切换中…</template>
-          <template v-else-if="registry.isEnabled(meta.id)">已启用</template>
-          <template v-else>已停用</template>
-        </button>
-      </li>
-    </ul>
+
+    <nav class="tabs">
+      <button v-for="tab in tabs" :key="tab.id" type="button" class="tab" :class="{ active: activeTab === tab.id }"
+        @click="activeTab = tab.id">
+        <span class="tab-label">{{ tab.label }}</span>
+        <span v-if="tab.count !== undefined" class="tab-count">{{ tab.count }}</span>
+      </button>
+    </nav>
+
+    <div class="tab-body">
+      <BuiltinTab v-if="activeTab === 'builtin'" />
+      <ExternalTab v-else-if="activeTab === 'external'" />
+      <DeveloperTab v-else />
+    </div>
   </section>
 </template>
 
@@ -60,128 +61,138 @@ async function handleToggle(id: string): Promise<void> {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 1.4rem;
   min-height: 0;
-  padding: 2.4rem 2.8rem;
+  padding: 2.8rem 3.2rem 4rem;
   overflow-y: auto;
-}
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-width: thin;
 
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+  .masthead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2.4rem;
 
-h1 {
-  margin: 0;
-  font-size: 1.8rem;
-  font-weight: 600;
-}
+    .identity {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      min-width: 0;
+    }
 
-.count {
-  padding: 0 0.8rem;
-  border-radius: 99.9rem;
-  background: var(--panel-2);
-  color: var(--muted);
-  font: 1.1rem var(--mono);
-}
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
 
-.lede {
-  margin: 0;
-  color: var(--muted);
-  font-size: 1.3rem;
-}
+    .lede {
+      max-width: 52rem;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.2rem;
+      line-height: 1.7;
+    }
 
-.plugin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+    .stats {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      align-items: flex-end;
+      gap: 0.3rem;
+    }
 
-.plugin-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.6rem;
-  padding: 1.2rem 1.4rem;
-  border: 0.1rem solid var(--line);
-  border-radius: 0.8rem;
-  background: var(--panel);
-}
+    .stat-value {
+      color: var(--text);
+      font: 500 1.9rem/1 var(--mono);
+      letter-spacing: 0.02em;
 
-.plugin-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-width: 0;
-}
+      i {
+        margin: 0 0.3rem;
+        color: var(--line);
+        font-style: normal;
+      }
+    }
 
-.plugin-label {
-  font-size: 1.4rem;
-  font-weight: 600;
-
-  .tag {
-    margin-left: 0.6rem;
-    padding: 0.1rem 0.6rem;
-    border-radius: 99.9rem;
-    font: 1rem var(--mono);
+    .stat-label {
+      color: var(--muted);
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+    }
   }
 
-  .tag-fixed {
-    background: var(--panel-2);
-    color: var(--muted);
+  .tabs {
+    display: flex;
+    gap: 2.8rem;
+    margin-top: 2.4rem;
+    border-bottom: 0.1rem solid var(--line);
+
+    .tab {
+      position: relative;
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      padding: 0 0.1rem 1.2rem;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.3rem;
+      cursor: pointer;
+      transition: color 0.15s;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: auto 0 -0.1rem 0;
+        height: 0.2rem;
+        background: var(--accent);
+        opacity: 0;
+        transform: scaleX(0.4);
+        transition: opacity 0.2s, transform 0.2s;
+      }
+
+      &:hover {
+        color: var(--text);
+      }
+
+      &.active {
+        color: var(--text);
+
+        &::after {
+          opacity: 1;
+          transform: scaleX(1);
+        }
+
+        .tab-count {
+          color: var(--accent);
+        }
+      }
+
+      .tab-count {
+        color: var(--muted);
+        font: 1rem var(--mono);
+        transition: color 0.15s;
+      }
+    }
+  }
+
+  .tab-body {
+    padding-top: 2.2rem;
+    animation: tab-in 0.22s ease both;
   }
 }
 
-.plugin-desc {
-  color: var(--muted);
-  font-size: 1.2rem;
-}
-
-.plugin-id {
-  font: 1rem var(--mono);
-  color: var(--muted);
-}
-
-.toggle {
-  flex-shrink: 0;
-  padding: 0.4rem 1.2rem;
-  border-radius: 0.6rem;
-  border: 0.1rem solid var(--line);
-  background: transparent;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-
-  &:disabled {
-    cursor: default;
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
   }
-}
 
-.toggle-fixed {
-  color: var(--muted);
-  border-color: var(--line);
-}
-
-.toggle-on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-}
-
-.toggle-off {
-  color: var(--muted);
-
-  &:hover:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 </style>

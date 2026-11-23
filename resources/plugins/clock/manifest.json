@@ -1,0 +1,7 @@
+{
+  "id": "clock",
+  "label": "时钟",
+  "description": "时钟插件",
+  "version": "0.1.0",
+  "entry": "main.js"
+}

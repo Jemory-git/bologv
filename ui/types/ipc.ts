@@ -14,8 +14,15 @@ export interface BootInfo {
   workingDir: string
 }
 
+export type WindowControlAction = 'minimize' | 'toggle-maximize' | 'close'
+
 /** preload 暴露的 API；没有 Electron 外壳时 window.bologui 不存在。 */
 export interface BologuiApi {
   boot(): Promise<BootInfo>
+  windowControl(action: WindowControlAction): Promise<void>
+  isWindowMaximized(): Promise<boolean>
+  onWindowMaximizedChanged(callback: (isMaximized: boolean) => void): () => void
   onEvent(callback: (event: SessionEvent) => void): () => void
+  /** 开发模式下插件源码变化时触发；返回退订函数。 */
+  onPluginsChanged(callback: () => void): () => void
 }

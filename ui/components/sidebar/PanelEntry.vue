@@ -1,24 +1,23 @@
 <script setup lang="ts">
-/**
- * 侧边栏面板入口：由 PairSlot SlotOutlet 渲染，
- * active / select 是 SlotOutlet 自动注入的 pair 专属 props。
- *
- * 本组件对 slots 体系完全不知情——它只是声明自己需要这两个 props，
- * 真正的选中态维护由 SlotRegistry 负责。
- */
+  /**
+   * 侧边栏面板入口：由 PairSlot ListSlotOutlet 渲染，
+   * active / select 是 ListSlotOutlet 自动注入的 pair 专属 props。
+   *
+   * 本组件对 slots 体系完全不知情——它只是声明自己需要这两个 props，
+   * 真正的选中态维护由 SlotRegistry 负责。
+   */
 
-defineProps<{
-  label: string
-  /** SlotOutlet 自动注入：当前 pair 是否被选中 */
-  active: boolean
-}>()
+  defineProps<{
+    label: string
+    /** ListSlotOutlet 自动注入：当前 pair 是否被选中 */
+    active: boolean
+  }>()
 
-const emit = defineEmits(['select'])
+  const emit = defineEmits(['select'])
 </script>
 
 <template>
-  <button class="panel-row" :class="{ active }" type="button" :aria-current="active ? 'page' : undefined"
-    @click="emit('select')">
+  <button class="panel-row" :class="{ active }" type="button" :aria-current="active ? 'page' : undefined" @click="emit('select')">
     <span class="glyph" aria-hidden="true" />
     <span class="label">{{ label }}</span>
   </button>

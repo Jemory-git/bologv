@@ -1,153 +1,153 @@
 <script setup lang="ts">
-/**
- * 模型配置：两层结构，全部来自/写入 settings/models.json
- *   Vendor  → 厂商：baseURL + apiKeyEnv（环境变量名）
- *   ModelDef → 模型：modelId + path，归属某个 vendor
- *
- * 数据源是 models store：打开时 load() 取最新配置做本地草稿；
- * 保存成功后再 load() 刷新 store，选中模型即时生效。
- *
- * 脚本编排顺序：states → methods → events → hooks → expose
- */
+  /**
+   * 模型配置：两层结构，全部来自/写入 settings/models.json
+   *   Vendor  → 厂商：baseURL + apiKeyEnv（环境变量名）
+   *   ModelDef → 模型：modelId + path，归属某个 vendor
+   *
+   * 数据源是 models store：打开时 load() 取最新配置做本地草稿；
+   * 保存成功后再 load() 刷新 store，选中模型即时生效。
+   *
+   * 脚本编排顺序：states → methods → events → hooks → expose
+   */
 
-// ———————————— imports ————————————
-import { computed, onMounted, reactive, ref, toRaw } from 'vue'
-import { setVendors } from '@ui/http'
-import { useModelsStore } from '@ui/stores/models.ts'
-import type { Ref } from 'vue'
-import type { Vendor } from '@pkg/llm/types.ts'
+  // ———————————— imports ————————————
+  import { computed, onMounted, reactive, ref, toRaw } from 'vue'
+  import { setVendors } from '@ui/http'
+  import { useModelsStore } from '@ui/stores/models.ts'
+  import type { Ref } from 'vue'
+  import type { Vendor } from '@pkg/llm/types.ts'
 
-// ============================================================================
-// states
-// ============================================================================
+  // ============================================================================
+  // states
+  // ============================================================================
 
-const models = useModelsStore()
+  const models = useModelsStore()
 
-// —— 厂商数据（从 models store 加载的本地草稿）——
-const vendors = reactive<Vendor[]>([])
-const selectedId: Ref<string | null> = ref(null)
-const selected = computed(() => vendors.find((v) => v.id === selectedId.value) ?? null)
+  // —— 厂商数据（从 models store 加载的本地草稿）——
+  const vendors = reactive<Vendor[]>([])
+  const selectedId: Ref<string | null> = ref(null)
+  const selected = computed(() => vendors.find((v) => v.id === selectedId.value) ?? null)
 
-// —— 加载/保存状态 ——
-const loading = ref(true)
-const saving = ref(false)
-const error = ref<string | null>(null)
+  // —— 加载/保存状态 ——
+  const loading = ref(true)
+  const saving = ref(false)
+  const error = ref<string | null>(null)
 
-// ============================================================================
-// methods
-// ============================================================================
+  // ============================================================================
+  // methods
+  // ============================================================================
 
-function uid(): string {
-  return window.crypto.randomUUID()
-}
-
-// —— 厂商操作 ——
-
-function addVendor(): void {
-  const v: Vendor = {
-    id: uid(),
-    name: 'New Vendor',
-    baseURL: '',
-    apiKeyEnv: '',
-    models: [],
+  function uid(): string {
+    return window.crypto.randomUUID()
   }
-  vendors.push(v)
-  selectedId.value = v.id
-}
 
-function removeVendor(id: string): void {
-  const idx = vendors.findIndex((v) => v.id === id)
-  if (idx === -1) return
-  vendors.splice(idx, 1)
-  if (selectedId.value === id) {
-    selectedId.value = vendors[idx]?.id ?? vendors[idx - 1]?.id ?? null
+  // —— 厂商操作 ——
+
+  function addVendor(): void {
+    const v: Vendor = {
+      id: uid(),
+      name: 'New Vendor',
+      baseURL: '',
+      apiKeyEnv: '',
+      models: [],
+    }
+    vendors.push(v)
+    selectedId.value = v.id
   }
-}
 
-// —— 模型操作 ——
-
-function addModel(vendorId: string): void {
-  const v = vendors.find((v) => v.id === vendorId)
-  if (!v) return
-  v.models.push({ id: uid(), modelId: '', path: '/chat/completions' })
-}
-
-function removeModel(vendorId: string, modelId: string): void {
-  const v = vendors.find((v) => v.id === vendorId)
-  if (!v) return
-  const idx = v.models.findIndex((m) => m.id === modelId)
-  if (idx !== -1) v.models.splice(idx, 1)
-}
-
-// —— 校验 & 保存 ——
-
-function validate(): string | null {
-  if (vendors.length === 0) return '至少需要一个厂商'
-  for (const v of vendors) {
-    if (!v.name.trim()) return '厂商名不能为空'
-    if (!v.baseURL.trim()) return `厂商 ${v.name} 的 baseURL 不能为空`
-    if (!v.apiKeyEnv.trim()) return `厂商 ${v.name} 需要填写 API Key 环境变量名`
-    for (const m of v.models) {
-      if (!m.modelId.trim()) return `厂商 ${v.name} 有未填写 modelId 的模型`
-      if (!m.path.startsWith('/')) return `模型 ${m.modelId || '(未填)'} 的 path 必须以 / 开头`
+  function removeVendor(id: string): void {
+    const idx = vendors.findIndex((v) => v.id === id)
+    if (idx === -1) return
+    vendors.splice(idx, 1)
+    if (selectedId.value === id) {
+      selectedId.value = vendors[idx]?.id ?? vendors[idx - 1]?.id ?? null
     }
   }
-  return null
-}
 
-async function handleSave(): Promise<void> {
-  const err = validate()
-  if (err !== null) {
-    error.value = err
-    return
+  // —— 模型操作 ——
+
+  function addModel(vendorId: string): void {
+    const v = vendors.find((v) => v.id === vendorId)
+    if (!v) return
+    v.models.push({ id: uid(), modelId: '', path: '' })
   }
-  error.value = null
-  saving.value = true
-  const [httpErr, body] = await setVendors({ vendors })
-  saving.value = false
-  if (httpErr) {
-    error.value = `保存失败：${httpErr.message}`
-    return
+
+  function removeModel(vendorId: string, modelId: string): void {
+    const v = vendors.find((v) => v.id === vendorId)
+    if (!v) return
+    const idx = v.models.findIndex((m) => m.id === modelId)
+    if (idx !== -1) v.models.splice(idx, 1)
   }
-  if (body.code !== 0) {
-    error.value = `保存失败：${body.msg || 'api error'}`
-    return
+
+  // —— 校验 & 保存 ——
+
+  function validate(): string | null {
+    if (vendors.length === 0) return '至少需要一个厂商'
+    for (const v of vendors) {
+      if (!v.name.trim()) return '厂商名不能为空'
+      if (!v.baseURL.trim()) return `厂商 ${v.name} 的 baseURL 不能为空`
+      if (!v.apiKeyEnv.trim()) return `厂商 ${v.name} 需要填写 API Key 环境变量名`
+      for (const m of v.models) {
+        if (!m.modelId.trim()) return `厂商 ${v.name} 有未填写 modelId 的模型`
+        if (!m.path.startsWith('/')) return `模型 ${m.modelId || '(未填)'} 的 path 必须以 / 开头`
+      }
+    }
+    return null
   }
-  const refreshErr = await models.load()
-  if (refreshErr !== null) {
-    error.value = refreshErr
-    return
+
+  async function handleSave(): Promise<void> {
+    const err = validate()
+    if (err !== null) {
+      error.value = err
+      return
+    }
+    error.value = null
+    saving.value = true
+    const [httpErr, body] = await setVendors({ vendors })
+    saving.value = false
+    if (httpErr) {
+      error.value = `保存失败：${httpErr.message}`
+      return
+    }
+    if (body.code !== 0) {
+      error.value = `保存失败：${body.msg || 'api error'}`
+      return
+    }
+    const refreshErr = await models.load()
+    if (refreshErr !== null) {
+      error.value = refreshErr
+      return
+    }
+    emit('close')
   }
-  emit('close')
-}
 
-// ============================================================================
-// events
-// ============================================================================
+  // ============================================================================
+  // events
+  // ============================================================================
 
-const emit = defineEmits<{
-  (e: 'close'): void
-}>()
+  const emit = defineEmits<{
+    (e: 'close'): void
+  }>()
 
-// ============================================================================
-// hooks
-// ============================================================================
+  // ============================================================================
+  // hooks
+  // ============================================================================
 
-onMounted(async () => {
-  const loadErr = await models.load()
-  loading.value = false
-  if (loadErr !== null) {
-    error.value = loadErr
-    return
-  }
-  vendors.splice(0, vendors.length, ...structuredClone(toRaw(models.vendors)))
-  selectedId.value = vendors[0]?.id ?? null
-})
+  onMounted(async () => {
+    const loadErr = await models.load()
+    loading.value = false
+    if (loadErr !== null) {
+      error.value = loadErr
+      return
+    }
+    vendors.splice(0, vendors.length, ...structuredClone(toRaw(models.vendors)))
+    selectedId.value = vendors[0]?.id ?? null
+  })
 
-// ============================================================================
-// expose
-// ============================================================================
-// (无)
+  // ============================================================================
+  // expose
+  // ============================================================================
+  // (无)
 </script>
 
 <template>
@@ -161,8 +161,7 @@ onMounted(async () => {
 
       <div v-if="loading" class="empty-hint">加载中…</div>
       <ul v-else-if="vendors.length > 0" class="vendor-list">
-        <li v-for="v in vendors" :key="v.id" class="vendor-item" :class="{ active: v.id === selectedId }"
-          @click="selectedId = v.id">
+        <li v-for="v in vendors" :key="v.id" class="vendor-item" :class="{ active: v.id === selectedId }" @click="selectedId = v.id">
           <span class="vendor-name">{{ v.name || '(未命名)' }}</span>
           <button type="button" class="btn-delete" title="删除厂商" @click.stop="removeVendor(v.id)">✕</button>
         </li>
@@ -220,8 +219,7 @@ onMounted(async () => {
                 <td><input v-model="m.modelId" type="text" class="input input-sm" placeholder="deepseek-chat" /></td>
                 <td><input v-model="m.path" type="text" class="input input-sm" placeholder="/chat/completions" /></td>
                 <td class="col-actions">
-                  <button type="button" class="btn-row-del" title="删除"
-                    @click="removeModel(selected.id, m.id)">✕</button>
+                  <button type="button" class="btn-row-del" title="删除" @click="removeModel(selected.id, m.id)">✕</button>
                 </td>
               </tr>
             </tbody>
@@ -233,7 +231,7 @@ onMounted(async () => {
       <footer class="form-actions">
         <p v-if="error" class="form-error">{{ error }}</p>
         <div class="spacer" />
-        <button type="button" class="btn btn-ghost" @click="emit('close')">取消</button>
+        <!-- <button type="button" class="btn btn-ghost" @click="emit('close')">取消</button> -->
         <button type="button" class="btn btn-primary" :disabled="saving || loading" @click="handleSave">
           {{ saving ? '保存中…' : '保存' }}
         </button>

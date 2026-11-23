@@ -1,12 +1,12 @@
 ﻿<script setup lang="ts">
-/**
- * 单条会话：点击时切回默认视图（选中 sidebar.panels 的 null）。
- * 直接拿 PairSlot，不需要经过 Registry。
- */
-import type { SessionSummary } from '@ui/types/view-model.ts'
-import { sidebarPanels } from '@ui/slots/pair/sidebar-panels.ts'
+  /**
+   * 单条会话：点击时切回默认视图（选中 sidebar.panels 的 null）。
+   * 直接拿 PairSlot，不需要经过 Registry。
+   */
+  import type { SessionSummary } from '@ui/types/view-model.ts'
+  import { sidebarPanels } from '@ui/slots'
 
-defineProps<{ session: SessionSummary; active: boolean }>()
+  defineProps<{ session: SessionSummary; active: boolean }>()
 </script>
 
 <template>

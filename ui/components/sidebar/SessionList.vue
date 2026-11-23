@@ -12,7 +12,7 @@
   import { computed } from 'vue'
   import type { SessionSummary } from '@ui/types/view-model.ts'
   import SessionItem from './SessionItem.vue'
-  import { sidebarPanels } from '@ui/slots/pair/sidebar-panels.ts'
+  import { sidebarPanels } from '@ui/slots'
 
   defineProps<{ sessions: readonly SessionSummary[] }>()
 

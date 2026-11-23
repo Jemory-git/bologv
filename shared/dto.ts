@@ -48,6 +48,33 @@ export interface SessionEventsResponse {
   events: SessionEvent[]
 }
 
+// —— External Plugins ——
+
+/** 一个可用的外置插件：元信息来自 manifest.json，代码启用时才加载。 */
+export interface ExternalPluginInfo {
+  id: string
+  label: string
+  description?: string
+  version?: string
+  /** 入口文件名，相对插件目录；UI 负责拼成同源 URL。 */
+  entry: string
+}
+
+/** 无法识别的插件目录：保留在清单里提示用户，而不是静默丢弃。 */
+export interface ExternalPluginIssue {
+  /** 目录名。 */
+  dir: string
+  /** 不可用原因。 */
+  reason: string
+}
+
+export interface ExternalPluginsResponse {
+  /** 外置插件根目录（绝对路径，供 UI 展示）。 */
+  dir: string
+  plugins: ExternalPluginInfo[]
+  broken: ExternalPluginIssue[]
+}
+
 // —— Plugins ——
 
 export interface PluginSettingsResponse {

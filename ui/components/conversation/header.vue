@@ -1,13 +1,12 @@
 ﻿<script setup lang="ts">
-/**
- * 对话标题栏：会话名、模型标识与操作区。
- */
-import SlotOutlet from '@ui/components/slots/SlotOutlet.vue'
-import { chatHeaderActions } from '@ui/slots/list/chat-header-actions.ts'
+  /**
+   * 对话标题栏：会话名、模型标识与操作区。
+   */
+  import ListSlotOutlet from '@ui/components/slots/ListSlotOutlet.vue'
+  import { chatHeaderActions } from '@ui/slots'
 
-defineProps<{ title: string; model: string; pending: boolean }>()
+  defineProps<{ title: string; model: string; }>()
 
-defineEmits<{ clear: [] }>()
 </script>
 
 <template>
@@ -17,14 +16,14 @@ defineEmits<{ clear: [] }>()
       <span class="badge">{{ model }}</span>
     </div>
     <div class="actions">
-      <SlotOutlet :slot="chatHeaderActions" />
-      <button type="button" :disabled="pending" @click="$emit('clear')">清空视图</button>
+      <ListSlotOutlet :slot="chatHeaderActions" reverse />
     </div>
   </header>
 </template>
 
 <style scoped lang="scss">
 .chat-header {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;

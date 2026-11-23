@@ -4,6 +4,7 @@ directories:
   output: dist-pkg
 files:
   - dist/**/*
+  - resources/**/*
 win:
   target:
     - target: nsis

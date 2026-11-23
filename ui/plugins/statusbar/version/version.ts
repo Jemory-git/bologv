@@ -1,5 +1,5 @@
 ﻿import type { Plugin } from '@pkg/cordis'
-import { statusbarItems } from '@ui/slots/list/statusbar-items.ts'
+import { statusbarItems } from '@ui/slots'
 import VersionItem from './VersionItem.vue'
 
 export const versionItem: Plugin = {

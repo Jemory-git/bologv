@@ -1,0 +1,7 @@
+{
+  "id": "turtle",
+  "label": "断网小乌龟",
+  "description": "断网小乌龟跳跃游戏，用 Vue 组件 + Canvas 绘制贴地爬行的小乌龟，演示外置插件生命周期与宿主 Vue 运行时",
+  "version": "0.1.0",
+  "entry": "main.js"
+}

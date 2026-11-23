@@ -36,7 +36,9 @@ export function createChatRouter(bootedPromise: Promise<Booted>) {
     if (running) {
       throw new ConflictError('session 已在运行中')
     }
+
     running = true
+
     try {
       await booted.loop.run(text, model)
       ctx.apiSuccess({ msg: 'ok', data: { ok: true } })

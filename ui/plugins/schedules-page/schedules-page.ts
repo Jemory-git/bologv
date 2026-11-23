@@ -5,7 +5,7 @@
 
 import type { Plugin } from '@pkg/cordis'
 import PanelEntry from '@ui/components/sidebar/PanelEntry.vue'
-import { sidebarPanels } from '@ui/slots/pair/sidebar-panels.ts'
+import { sidebarPanels } from '@ui/slots'
 import SchedulesView from './SchedulesView.vue'
 
 export const schedulesPage: Plugin = {

@@ -1,165 +1,146 @@
 /**
- * 插件注册中心：清单 + 启停管理器。
+ * 插件注册中心：统一清单 + 启停管理器。
  *
- * 清单列出**全部插件**——包括固定插件（fixed: true，main.ts 直接 use，不能关）
- * 和可切换插件（toggleable，registry 按 HTTP 持久化或 defaultEnabled 启停）。
- * registry 对 fixed 插件只在 activeIds 里标记"已启用"，不插手加载/卸载。
+ * 清单有两个来源（见 types.ts）：
+ *   - 内置：builtin.ts 的静态常量，编译期已存在；
+ *   - 外置：运行时从 userData/plugins 发现，启用时才动态 import。
  *
- *   - 固定插件：渲染器、连接层、插件管理、状态栏条目……基础架构，关不掉。
- *   - 可切换插件：schedules-page（定时任务）……用户可 toggle。
+ * 两者共用一条生命周期：
+ *   enable  → 解析插件对象 → ctx.use() → 记下 scope
+ *   disable → scope.dispose() → 插槽注册与视图随之消失
  *
- * import 顺序：pluginRegistry 必须在所有 fixed 插件之前 use——这样 registry
- * 启动时就能把 fixed 全部标记进 activeIds，plugins-page 视图完整显示。
+ * 固定插件（builtin.fixed）由 main.ts 直接 use，registry 只把它们标记为已启用。
+ *
+ * import 顺序：pluginRegistry 必须在所有固定插件之前 use。
  */
 
-import { shallowReactive } from 'vue'
+import { ref, shallowReactive } from 'vue'
+import { getExternalPlugins, getPluginSettings, setPluginSettings } from '@ui/http'
+import { BUILTIN_PLUGINS } from './builtin.ts'
+import { BRIDGE_SERVICE } from './electron-bridge.ts'
+import { loadExternalPlugin } from './external.ts'
 import type { Context, Plugin } from '@pkg/cordis'
-import { getPluginSettings, setPluginSettings } from '@ui/http/plugins.ts'
-import { electronBridge } from '@ui/plugins/core/electron-bridge.ts'
-import { pluginsPage } from '@ui/plugins/plugins-page/plugins-page.ts'
-import { sessionPathItem } from '@ui/plugins/statusbar/session-path/session-path.ts'
-import { versionItem } from '@ui/plugins/statusbar/version/version.ts'
-import { workingDirItem } from '@ui/plugins/statusbar/working-dir/working-dir.ts'
-import { vueRenderer } from '@ui/renderer/vue-renderer.ts'
-import { schedulesPage } from '@ui/plugins/schedules-page/schedules-page.ts'
+import type { ExternalPluginIssue, ExternalPluginsResponse } from '../../../shared/dto.ts'
+import type { BridgeService } from './electron-bridge.ts'
+import type { ExternalPluginMeta, UiPluginMeta } from './types.ts'
 
 /** Service 名，供 inject / require 使用。 */
 export const PLUGIN_REGISTRY_SERVICE = 'pluginRegistry'
 
-/** 清单条目——描述一个插件在插件管理视图中的元信息。 */
-export interface UiPluginMeta {
-  /** 唯一标识；与 Plugin.name 对应。 */
-  id: string
-  /** 插件对象（fixed 条目只用于展示，不通过 registry enable）。 */
-  plugin: Plugin
-  /** 用户可见名称。 */
-  label: string
-  /** 用户可见描述（可选）。 */
-  description?: string
-  /** 是否固定插件——固定插件在 main.ts 直接 use，不能 toggle。 */
-  fixed?: boolean
-  /** 可切换插件的默认启用状态（持久化缺失时的初始值）。 */
-  defaultEnabled?: boolean
-}
-
 /** 注册中心对外接口。 */
 export interface PluginRegistryService {
-  /** 完整清单（只读）。 */
+  /** 完整清单（内置 + 外置），响应式。 */
   readonly all: readonly UiPluginMeta[]
-  /** 当前已启用的 id 集合（Vue 响应式；fixed 的也会出现在这里）。 */
+  /** 当前已启用的 id 集合（含固定插件）。 */
   readonly activeIds: ReadonlySet<string>
+  /** 外置插件加载失败原因，按 id 索引；启用成功时清除。 */
+  readonly loadErrors: ReadonlyMap<string, string>
+  /** 无法识别的外置插件目录。 */
+  readonly issues: readonly ExternalPluginIssue[]
+  /** 外置插件根目录；首次扫描完成前为空字符串。 */
+  readonly externalDir: string
+  /** 是否正在扫描外置插件目录。 */
+  readonly scanning: boolean
   /** 按 id 查元信息；找不到返回 undefined。 */
   getMeta(id: string): UiPluginMeta | undefined
-  /** 启用可切换插件；fixed 的直接拒绝。已启用时 no-op。 */
+  /** 启用插件；加载失败会记入 loadErrors 并广播 plugin/error，不抛出。 */
   enable(id: string): Promise<void>
-  /** 禁用可切换插件；fixed 的直接拒绝。未启用时 no-op。 */
+  /** 停用插件；固定插件直接忽略。 */
   disable(id: string): Promise<void>
-  /** 当前启用的可切换插件就禁用，反之就启用；fixed 的直接拒绝。 */
+  /** 已启用则停用，反之启用。 */
   toggle(id: string): Promise<void>
+  /** 重新 import 代码（仅外置且正在运行）：停用后以新时间戳重新加载。 */
+  reload(id: string): Promise<void>
+  /** 重新扫描 userData/plugins，与磁盘现状对齐。 */
+  rescan(): Promise<void>
   /** 查询某 id 当前是否已启用（Vue 响应式，可在模板里用）。 */
   isEnabled(id: string): boolean
 }
 
-// ---------------------------------------------------------------------------
-// 完整清单 —— 全部插件都在这里出现。fixed 条目不经过 enable 链路，
-// 在 main.ts 里由 bootstrap 直接 use，registry 只负责"知道它们存在"。
-// ---------------------------------------------------------------------------
-
-export const UI_PLUGINS: UiPluginMeta[] = [
-  // —— 固定插件（基础架构，关不掉）——
-  { id: vueRenderer.name,    plugin: vueRenderer,    label: '渲染器',   fixed: true, description: 'Vue 渲染进程挂载' },
-  { id: electronBridge.name, plugin: electronBridge, label: '连接', fixed: true, description: '主进程 IPC 通信' },
-  { id: pluginsPage.name,    plugin: pluginsPage,    label: '插件仓库', fixed: true, description: '插件管理界面' },
-  { id: workingDirItem.name, plugin: workingDirItem, label: '工作目录', fixed: false, description: '状态栏条目' },
-  { id: sessionPathItem.name, plugin: sessionPathItem, label: '会话路径', fixed: false, description: '状态栏条目' },
-  { id: versionItem.name,    plugin: versionItem,    label: '版本号',   fixed: false, description: '状态栏条目' },
-
-  // —— 可切换插件（用户可 toggle）——
-  { id: schedulesPage.name, plugin: schedulesPage, label: '定时任务', defaultEnabled: false, description: '定时执行的日程管理' },
-]
+/** 内置 id 集合：外置插件不允许占用这些 id。 */
+const BUILTIN_IDS = new Set(BUILTIN_PLUGINS.map((meta) => meta.id))
 
 // ---------------------------------------------------------------------------
-// 持久化 —— 只记住可切换插件的启用状态
-// 通过 HTTP 写入 userData/settings/plugins.json
-// ---------------------------------------------------------------------------
-
-/** 可切换插件 id 列表，按顺序过滤。 */
-const TOGGLABLE_IDS = UI_PLUGINS
-  .filter((m) => !m.fixed)
-  .map((m) => m.id)
-
-async function loadSavedEnabled(): Promise<Set<string> | null> {
-  const [err, body] = await getPluginSettings()
-  if (err) return null
-  const list = body?.data?.enabled
-  if (!Array.isArray(list)) return null
-  return new Set(list.filter((v) => typeof v === 'string' && TOGGLABLE_IDS.includes(v)))
-}
-
-async function saveEnabled(ids: ReadonlySet<string>): Promise<void> {
-  const toSave = [...ids].filter((id) => TOGGLABLE_IDS.includes(id))
-  const [err] = await setPluginSettings({ enabled: toSave })
-  // 持久化失败不影响内存态，但必须可见：由调用方转成 plugin/error 告警。
-  if (err) throw new Error(`插件启用状态保存失败：${err.message}`)
-}
-
-// ---------------------------------------------------------------------------
-// Plugin 实现
+// 插件实现
 // ---------------------------------------------------------------------------
 
 export const pluginRegistry: Plugin = {
   name: 'plugin-registry',
   apply(ctx) {
+    const catalog = shallowReactive<UiPluginMeta[]>([...BUILTIN_PLUGINS])
+    const activeIds = shallowReactive(new Set<string>())
+    const loadErrors = shallowReactive(new Map<string, string>())
+    const issues = shallowReactive<ExternalPluginIssue[]>([])
     const scopes = new Map<string, Context>()
     /** 正在启停中的插件：await 期间拒绝重入，避免双击导致双重 use。 */
     const pending = new Set<string>()
-    // shallowReactive 让 Vue detect 到 Set 的 add/delete 变化
-    const activeIds: Set<string> = shallowReactive(new Set())
+    const scanning = ref(false)
+    const externalDir = ref('')
 
-    const all = Object.freeze(UI_PLUGINS)
+    // —— 查询 ——
 
     const getMeta = (id: string): UiPluginMeta | undefined =>
-      all.find((m) => m.id === id)
+      catalog.find((meta) => meta.id === id)
 
-    const isFixed = (id: string): boolean => getMeta(id)?.fixed === true
+    const isFixed = (id: string): boolean => {
+      const meta = getMeta(id)
+      return meta !== undefined && meta.origin === 'builtin' && meta.fixed
+    }
 
     const isEnabled = (id: string): boolean => activeIds.has(id)
 
-    // 持久化失败不回滚内存态，但与加载失败走同一告警通道（main.ts 消费）。
+    // —— 持久化：只记可切换插件的启用状态 ——
+
     const persistEnabled = async (id: string): Promise<void> => {
+      const enabled = [...activeIds].filter((activeId) => !isFixed(activeId))
       try {
-        await saveEnabled(activeIds)
+        await saveEnabled(enabled)
       } catch (error) {
+        // 持久化失败不回滚内存态，但必须可见：走与加载失败相同的告警通道。
         ctx.emit('plugin/error', { id, error })
       }
     }
 
+    // —— 生命周期 ——
+
+    const resolvePlugin = async (meta: UiPluginMeta): Promise<Plugin> => meta.origin === 'builtin' ? meta.plugin : loadExternalPlugin(meta)
+
     const enable = async (id: string): Promise<void> => {
-      if (isFixed(id)) throw new Error(`plugin "${id}" is fixed, cannot enable/disable`)
-      if (activeIds.has(id) || pending.has(id)) return
+      if (isFixed(id) || activeIds.has(id) || pending.has(id)) return
       const meta = getMeta(id)
-      if (!meta) throw new Error(`plugin "${id}" not found in registry`)
+      if (meta === undefined) throw new Error(`plugin "${id}" not found in registry`)
+
       pending.add(id)
       try {
-        const scope = await ctx.use(meta.plugin)
+        const plugin = await resolvePlugin(meta)
+        const scope = await ctx.use(plugin)
         scopes.set(id, scope)
         activeIds.add(id)
+        loadErrors.delete(id)
         await persistEnabled(id)
         ctx.emit('plugin/enabled', id)
+      } catch (error) {
+        loadErrors.set(id, errorMessage(error))
+        ctx.emit('plugin/error', { id, error })
       } finally {
         pending.delete(id)
       }
     }
 
     const disable = async (id: string): Promise<void> => {
-      if (isFixed(id)) throw new Error(`plugin "${id}" is fixed, cannot enable/disable`)
-      if (!activeIds.has(id) || pending.has(id)) return
-      const scope = scopes.get(id)
-      if (scope === undefined) return
+      if (isFixed(id) || !activeIds.has(id) || pending.has(id)) return
+
       pending.add(id)
       try {
-        scope.dispose()
-        scopes.delete(id)
+        const scope = scopes.get(id)
+        if (scope !== undefined) {
+          try {
+            scope.dispose()
+          } catch (error) {
+            ctx.emit('plugin/error', { id, error })
+          }
+          scopes.delete(id)
+        }
         activeIds.delete(id)
         await persistEnabled(id)
         ctx.emit('plugin/disabled', id)
@@ -169,43 +150,143 @@ export const pluginRegistry: Plugin = {
     }
 
     const toggle = async (id: string): Promise<void> => {
-      if (isFixed(id)) return  // fixed 插件，no-op（UI 应该禁用按钮）
+      if (isFixed(id)) return
       if (activeIds.has(id)) await disable(id)
       else await enable(id)
     }
 
+    const reload = async (id: string): Promise<void> => {
+      const meta = getMeta(id)
+      if (meta?.origin !== 'external' || !activeIds.has(id) || pending.has(id)) return
+      await disable(id)
+      await enable(id) // 新的时间戳 → 重新拉取并执行磁盘上的最新代码
+    }
+
+    // —— 外置清单同步 ——
+
+    const removeFromCatalog = (id: string): void => {
+      const index = catalog.findIndex((meta) => meta.id === id)
+      if (index >= 0) catalog.splice(index, 1)
+      scopes.delete(id)
+      loadErrors.delete(id)
+    }
+
+    /** 与磁盘现状对齐：消失的停用并移除，新增/变更的更新元信息；运行中的不重载。 */
+    const applyCatalog = async (data: ExternalPluginsResponse): Promise<void> => {
+      externalDir.value = data.dir
+      const incoming = new Map(data.plugins.map((info) => [info.id, info]))
+
+      for (const meta of [...catalog]) {
+        if (meta.origin !== 'external' || incoming.has(meta.id)) continue
+        if (activeIds.has(meta.id)) await disable(meta.id)
+        removeFromCatalog(meta.id)
+      }
+
+      for (const info of data.plugins) {
+        if (BUILTIN_IDS.has(info.id)) continue // 冲突项只进 issues，不能覆盖内置条目
+        const meta: ExternalPluginMeta = {
+          origin: 'external',
+          id: info.id,
+          label: info.label,
+          description: info.description,
+          version: info.version,
+          entry: info.entry,
+        }
+        const index = catalog.findIndex((item) => item.id === info.id)
+        if (index >= 0) catalog[index] = meta
+        else catalog.push(meta)
+      }
+
+      const conflicts = data.plugins
+        .filter((info) => BUILTIN_IDS.has(info.id))
+        .map((info) => ({ dir: info.id, reason: '外置插件 id 与内置插件冲突' }))
+      issues.splice(0, issues.length, ...data.broken, ...conflicts)
+    }
+
+    const rescan = async (): Promise<void> => {
+      if (scanning.value) return
+      scanning.value = true
+      try {
+        const [err, body] = await getExternalPlugins()
+        if (err !== null || body.code !== 0 || body.data === undefined) {
+          ctx.emit('plugin/error', {
+            id: 'external-plugins',
+            error: err ?? new Error(body.msg === '' ? '外置插件扫描失败' : body.msg),
+          })
+          return
+        }
+        await applyCatalog(body.data)
+      } finally {
+        scanning.value = false
+      }
+    }
+
+    // —— 启动：固定插件先备案，其余按持久化 / 默认值启用 ——
+
+    for (const meta of catalog) {
+      if (meta.origin === 'builtin' && meta.fixed) activeIds.add(meta.id)
+    }
+
+    // —— 开发模式热重载：主进程监听源码目录，变化后重扫并重载运行中的外置插件 ——
+
+    const refreshExternal = async (): Promise<void> => {
+      await rescan()
+      for (const id of [...activeIds]) {
+        if (getMeta(id)?.origin === 'external') await reload(id)
+      }
+    }
+
+    const bridge = ctx.require<BridgeService>(BRIDGE_SERVICE)
+    ctx.effect(bridge.onPluginsChanged(() => void refreshExternal()))
+
+    const bootstrap = async (): Promise<void> => {
+      const [saved] = await Promise.all([loadSavedEnabled(), rescan()])
+      const toggleable = catalog.filter((meta) => meta.origin === 'external' || !meta.fixed)
+      const toEnable = saved !== null
+        ? toggleable.filter((meta) => saved.has(meta.id))
+        : toggleable.filter((meta) => meta.origin === 'builtin' && meta.defaultEnabled === true)
+
+      for (const meta of toEnable) await enable(meta.id)
+    }
+
     const service: PluginRegistryService = {
-      all,
+      all: catalog,
       activeIds,
+      loadErrors,
+      issues,
+      get externalDir() { return externalDir.value },
+      get scanning() { return scanning.value },
       getMeta,
       enable,
       disable,
       toggle,
+      reload,
+      rescan,
       isEnabled,
     }
 
     ctx.provide<PluginRegistryService>(PLUGIN_REGISTRY_SERVICE, service)
-
-    // —— 同步标记 fixed 插件为 active（它们在 main.ts 里接着 use）——
-    for (const meta of all) {
-      if (meta.fixed) activeIds.add(meta.id)
-    }
-
-    // —— 异步初始化可切换插件（读 HTTP，缺省时用 defaultEnabled）——
-    void (async () => {
-      const saved = await loadSavedEnabled()
-      const togglable = all.filter((m) => !m.fixed)
-      const toEnable = saved !== null
-        ? togglable.filter((m) => saved.has(m.id))
-        : togglable.filter((m) => m.defaultEnabled)
-
-      for (const meta of toEnable) {
-        try {
-          await enable(meta.id)
-        } catch (error) {
-          ctx.emit('plugin/error', { id: meta.id, error })
-        }
-      }
-    })()
+    void bootstrap()
   },
+}
+
+// ---------------------------------------------------------------------------
+// 持久化：只保存可切换插件的启用状态
+// ---------------------------------------------------------------------------
+
+async function saveEnabled(ids: string[]): Promise<void> {
+  const [err] = await setPluginSettings({ enabled: ids })
+  if (err !== null) throw new Error(`插件启用状态保存失败：${err.message}`)
+}
+
+async function loadSavedEnabled(): Promise<Set<string> | null> {
+  const [err, body] = await getPluginSettings()
+  if (err !== null) return null
+  const list = body.data?.enabled
+  if (!Array.isArray(list)) return null
+  return new Set(list.filter((id) => typeof id === 'string'))
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

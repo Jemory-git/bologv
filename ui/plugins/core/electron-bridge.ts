@@ -9,9 +9,11 @@
  * HTTP 业务调用（chat / models）由 UI 直接 import @ui/http/fetch.ts 发起。
  */
 
-import { shallowRef, type ShallowRef } from 'vue'
+import { shallowRef } from 'vue'
+
+import type { ShallowRef } from 'vue'
 import type { Plugin } from '@pkg/cordis'
-import type { BootInfo } from '@ui/types/ipc.ts'
+import type { BootInfo, WindowControlAction } from '@ui/types/ipc.ts'
 import type { SessionEvent } from '@pkg/session'
 
 export const BRIDGE_SERVICE = 'electronBridge'
@@ -20,8 +22,16 @@ export const BRIDGE_SERVICE = 'electronBridge'
 export interface BridgeService {
   /** 拉取启动信息；重复调用返回同一个 promise。 */
   boot(): Promise<BootInfo>
+  /** 控制当前窗口。 */
+  controlWindow(action: WindowControlAction): Promise<void>
+  /** 查询当前窗口是否已最大化。 */
+  isWindowMaximized(): Promise<boolean>
+  /** 订阅当前窗口最大化状态变化；返回退订函数。 */
+  onWindowMaximizedChanged(listener: (isMaximized: boolean) => void): () => void
   /** 订阅会话事件；返回退订函数。 */
   onEvent(listener: (event: SessionEvent) => void): () => void
+  /** 订阅插件源码变化（仅开发模式产生）；返回退订函数。 */
+  onPluginsChanged(listener: () => void): () => void
   /** 已拉取的启动信息；boot() 完成前为 null。 */
   readonly bootInfo: ShallowRef<BootInfo | null>
 }
@@ -45,7 +55,11 @@ export const electronBridge: Plugin = {
           return info
         }))
       },
+      controlWindow: (action) => api.windowControl(action),
+      isWindowMaximized: () => api.isWindowMaximized(),
+      onWindowMaximizedChanged: (listener) => api.onWindowMaximizedChanged(listener),
       onEvent: (listener) => api.onEvent(listener),
+      onPluginsChanged: (listener) => api.onPluginsChanged(listener),
       bootInfo,
     }
     ctx.provide(BRIDGE_SERVICE, service)

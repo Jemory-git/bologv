@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import { createRoot } from '@pkg/cordis'
 import { BRIDGE_SERVICE, electronBridge } from './plugins/core/electron-bridge.ts'
 import { pluginRegistry } from './plugins/core/plugin-registry.ts'
+import { windowControls } from './plugins/titlebar/window-controls/window-controls.ts'
 import { pluginsPage } from './plugins/plugins-page/plugins-page.ts'
 import { RENDERER_SERVICE, vueRenderer } from './renderer/vue-renderer.ts'
 import { getSessionEvents } from '@ui/http'
@@ -25,10 +26,12 @@ async function main(): Promise<void> {
   })
 
   // Cordis 插件装配顺序：
-  //   vueRenderer → electronBridge → pluginRegistry（需在 fixed 插件之前） → pluginsPage
+  //   vueRenderer → electronBridge → pluginRegistry（需在 fixed 插件之前）→ windowControls → pluginsPage
+  // windowControls 最早注册到右槽，后续扩展只会出现在它左侧。
   await rootCtx.use(vueRenderer)
   await rootCtx.use(electronBridge)
   await rootCtx.use(pluginRegistry)
+  await rootCtx.use(windowControls)
   await rootCtx.use(pluginsPage)
 
   const bridge = rootCtx.require<BridgeService>(BRIDGE_SERVICE)
