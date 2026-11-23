@@ -207,11 +207,11 @@ export const pluginRegistry: Plugin = {
       if (scanning.value) return
       scanning.value = true
       try {
-        const [err, body] = await getExternalPlugins()
-        if (err !== null || body.code !== 0 || body.data === undefined) {
+        const [, body] = await getExternalPlugins()
+        if (body.code !== 0 || body.data === undefined) {
           ctx.emit('plugin/error', {
             id: 'external-plugins',
-            error: err ?? new Error(body.msg === '' ? '外置插件扫描失败' : body.msg),
+            error: new Error(body.msg === '' ? '外置插件扫描失败' : body.msg),
           })
           return
         }
@@ -275,13 +275,13 @@ export const pluginRegistry: Plugin = {
 // ---------------------------------------------------------------------------
 
 async function saveEnabled(ids: string[]): Promise<void> {
-  const [err] = await setPluginSettings({ enabled: ids })
-  if (err !== null) throw new Error(`插件启用状态保存失败：${err.message}`)
+  const [, body] = await setPluginSettings({ enabled: ids })
+  if (body.code !== 0) throw new Error(`插件启用状态保存失败：${body.msg || 'api error'}`)
 }
 
 async function loadSavedEnabled(): Promise<Set<string> | null> {
-  const [err, body] = await getPluginSettings()
-  if (err !== null) return null
+  const [, body] = await getPluginSettings()
+  if (body.code !== 0) return null
   const list = body.data?.enabled
   if (!Array.isArray(list)) return null
   return new Set(list.filter((id) => typeof id === 'string'))

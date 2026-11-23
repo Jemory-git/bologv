@@ -127,21 +127,22 @@ export class Context {
     return new Context(this.services, this.events, this.#disposed, name)
   }
 
-  /** 使用插件：等依赖 → 子作用域 apply → 记录回收。 */
+  /** 使用插件：等依赖 → 子作用域 apply → 记录回收。对象插件与函数插件都支持。 */
   async use(plugin: Plugin, config?: Record<string, unknown>): Promise<Context> {
     if (this.#disposed.current) throw new Error('context is disposed')
-    const scope = this.child(plugin.name)
-    await scope.wait(plugin.inject ?? [])
+    const { name, inject, apply } = normalizePlugin(plugin)
+    const scope = this.child(name)
+    await scope.wait(inject)
     if (this.#disposed.current) throw new Error('context is disposed')
-    this.emit('plugin/start', plugin.name)
+    this.emit('plugin/start', name)
     try {
-      await plugin.apply(scope, config)
+      await apply(scope, config)
     } catch (error) {
       // apply 中途失败：立即回收子 scope 已注册的贡献，避免服务/监听残留全局表。
       try {
         scope.dispose()
       } catch (disposeError) {
-        console.error(`[cordis] disposing failed plugin "${plugin.name}" threw:`, disposeError)
+        console.error(`[cordis] disposing failed plugin "${name}" threw:`, disposeError)
       }
       throw error
     }
@@ -151,7 +152,7 @@ export class Context {
     this.scope.effect(entry)
     scope.#parentScope = this.scope
     scope.#parentEntry = entry
-    this.emit('plugin/ready', plugin.name)
+    this.emit('plugin/ready', name)
     return scope
   }
 
@@ -161,5 +162,28 @@ export class Context {
     // 解除所有挂起的 wait()，让卡住的 use() 抛错而非永久挂起。
     this.services.rejectAllWaiters('context is disposed')
     this.dispose()
+  }
+}
+
+/** 统一的插件元数据形态。 */
+interface NormalizedPlugin {
+  name: string
+  inject: string[]
+  apply(ctx: Context, config?: Record<string, unknown>): void | Promise<void>
+}
+
+/** 对象插件与函数插件归一化：函数插件用函数名作作用域名，inject 挂在函数属性上。 */
+function normalizePlugin(plugin: Plugin): NormalizedPlugin {
+  if (typeof plugin === 'function') {
+    return {
+      name: plugin.name || '<anonymous>',
+      inject: plugin.inject ?? [],
+      apply: plugin,
+    }
+  }
+  return {
+    name: plugin.name,
+    inject: plugin.inject ?? [],
+    apply: (ctx, config) => plugin.apply(ctx, config),
   }
 }

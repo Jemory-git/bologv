@@ -7,10 +7,10 @@
  */
 import type { SessionEvent } from '@pkg/session'
 
-/** boot 通道的返回：插件列表、会话路径、工作目录。 */
+/** boot 通道的返回：插件列表、会话根目录、工作目录。 */
 export interface BootInfo {
   plugins: string[]
-  sessionPath: string
+  sessionsRoot: string
   workingDir: string
 }
 

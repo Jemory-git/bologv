@@ -19,8 +19,7 @@ export const useModelsStore = defineStore('models', () => {
   //methods
   /** 拉取最新厂商配置；失败返回错误文案，成功返回 null。 */
   async function load(): Promise<string | null> {
-    const [err, body] = await getVendors()
-    if (err) return `加载失败：${err.message}`
+    const [, body] = await getVendors()
     if (body.code !== 0) return `加载失败：${body.msg || 'api error'}`
 
     vendors.value = body.data ?? []

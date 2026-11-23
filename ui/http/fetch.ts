@@ -5,9 +5,13 @@
  * 不解释 service 层的业务契约（code / msg / errCode），
  * 那些由调用方自己根据需要判断。
  *
+ * 传输失败（网络中断 / HTTP 非 200 / 响应体非法 JSON）也归一成 code:-1 的合成
+ * envelope，并把原因写入 msg —— 与 service 的业务错误共用同一种读法：
+ * 调用方只看 body.code，展示错误时只看 body.msg。
+ * tuple 第一项是原始 Error，保留给日志/调试，UI 展示不需要它。
+ *
  * 返回 tuple [Error | null, Body<T>, Response | null]：
- *   - err !== null → transport 层失败（网络中断 / HTTP 非 200 / 响应体非法 JSON）
- *   - err === null → 有完整 JSON 响应，调用方自己判 body.code
+ *   - code !== 0 → 失败（传输层或业务层），原因在 msg
  *   - 第三项仅在拿到真实响应时存在，网络层失败时为 null
  *
  * 一切异常在本层吸收为 tuple，调用方保持无 try/catch 的扁平控制流。
@@ -23,7 +27,7 @@ type AppFetchReturn<T> = Promise<[Error | null, Body<T>, Response | null]>
 
 type AppFetchOptions = {
   url: string
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   params?: Record<string, any>
   body?: any
   headers?: Record<string, string>
@@ -62,14 +66,14 @@ export async function appFetch<T>(options: AppFetchOptions): AppFetchReturn<T> {
 
     // HTTP 层错误
     if (!res.ok) {
-      return [new Error(`HTTP ${res.status}`), { code: -1, msg: '' }, res]
+      return [new Error(`HTTP ${res.status}`), { code: -1, msg: `HTTP ${res.status}` }, res]
     }
 
     return [null, (await res.json()) as Body<T>, res]
   } catch (error) {
     // 网络中断、响应体截断 / 非法 JSON 等：归一为 tuple，不让异常穿透到调用方
     const err = error instanceof Error ? error : new Error(String(error))
-    return [err, { code: -1, msg: '' }, null]
+    return [err, { code: -1, msg: err.message }, null]
   }
 }
 
@@ -82,6 +86,9 @@ export const http = {
   },
   put<T>(url: string, body?: any): AppFetchReturn<T> {
     return appFetch({ url, method: 'PUT', body })
+  },
+  patch<T>(url: string, body?: any): AppFetchReturn<T> {
+    return appFetch({ url, method: 'PATCH', body })
   },
   delete<T>(url: string, params?: Record<string, any>): AppFetchReturn<T> {
     return appFetch({ url, method: 'DELETE', params })

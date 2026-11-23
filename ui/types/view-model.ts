@@ -11,7 +11,7 @@ export type ChatEntry =
   | { kind: 'notice'; text: string }
   | { kind: 'error'; text: string }
 
-/** 侧边栏会话条目；当前阶段只有一个默认会话。 */
+/** 侧边栏会话条目：后端给出标题，前端只补展示用时间文案。 */
 export interface SessionSummary {
   id: string
   title: string

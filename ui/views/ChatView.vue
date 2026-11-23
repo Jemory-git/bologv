@@ -11,6 +11,7 @@
   import Input from '@ui/components/conversation/input.vue'
   import Body from '@ui/components/conversation/body.vue'
   import { chat as httpChat } from '@ui/http/chat.ts'
+  import { createSession } from '@ui/http/sessions.ts'
   import { useChatStore } from '@ui/stores/chat.ts'
   import { useModelsStore } from '@ui/stores/models.ts'
   import { useStatusStore } from '@ui/stores/status.ts'
@@ -32,11 +33,29 @@
     }
 
     chat.setPending(true)
-    const [err, body] = await httpChat({ text: value, model })
 
-    if (err) {
-      chat.appendError(`请求失败：${err.message}`)
-    } else if (body.code !== 0) {
+    // 草稿态（新建后尚未发送）：首条消息发出前才真正创建会话
+    let sessionId = chat.currentSessionId
+    if (sessionId === null) {
+      const [, created] = await createSession()
+      if (created.code !== 0) {
+        chat.appendError(`创建会话失败：${created.msg || 'unknown error'}`)
+        chat.setPending(false)
+        return
+      }
+      const id = created.data?.id
+      if (id === undefined) {
+        chat.appendError('创建会话失败：响应缺少会话 id')
+        chat.setPending(false)
+        return
+      }
+      sessionId = id
+      chat.openSession(id)
+    }
+
+    const [, body] = await httpChat({ text: value, model, sessionId })
+
+    if (body.code !== 0) {
       chat.appendError(`请求失败：${body.msg || 'api error'}`)
       // envelope 里 errCode 500 来自 StorageError（会话持久化失败）：
       // 置位常驻告警，提醒用户保存已坏、重启会丢，先修复再继续。

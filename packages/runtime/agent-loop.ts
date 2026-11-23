@@ -1,18 +1,18 @@
 /**
- * 编排循环。对应真实仓库 packages/core/agent-loop。
+ * 编排循环：请求 → 工具 → 回灌。
  *
- * 它不实现任何具体能力：模型来自 llm 服务，工具来自 tools 服务，
- * 历史来自 session 服务。循环本身只有「请求 → 执行 → 回灌」。
+ * 不实现具体能力：模型来自 llm 服务，工具来自 tools 服务，
+ * 历史来自当前活跃会话（通过 SessionManager.active）。
  *
  * 检查点是可选依赖：没有加载持久化策略时，循环照常工作。
  */
 
-import type { Plugin } from '@pkg/cordis'
+import type { PluginObject } from '@pkg/cordis'
 import {
   CHECKPOINT_SERVICE_NAME,
-  SESSION_SERVICE_NAME,
+  SESSION_MANAGER_SERVICE_NAME,
   type CheckpointService,
-  type SessionService,
+  type SessionManager,
 } from '@pkg/session'
 import { LLM_SERVICE_NAME, type LLMResult, type LLMService } from '@pkg/llm'
 import { TOOLS_SERVICE_NAME, type ToolRegistry } from '@pkg/tools'
@@ -24,26 +24,26 @@ export interface AgentLoopService {
 
 export const AGENT_LOOP_SERVICE_NAME = 'agentLoop'
 
-export const agentLoopPlugin: Plugin = {
+export const agentLoopPlugin: PluginObject = {
   name: 'agent-loop',
-  inject: [LLM_SERVICE_NAME, TOOLS_SERVICE_NAME, SESSION_SERVICE_NAME],
+  inject: [LLM_SERVICE_NAME, TOOLS_SERVICE_NAME, SESSION_MANAGER_SERVICE_NAME],
   apply(ctx, config) {
     const llm = ctx.require<LLMService>(LLM_SERVICE_NAME)
     const tools = ctx.require<ToolRegistry>(TOOLS_SERVICE_NAME)
-    const session = ctx.require<SessionService>(SESSION_SERVICE_NAME)
-    const checkpoint = ctx.get<CheckpointService>(CHECKPOINT_SERVICE_NAME)
+    const manager = ctx.require<SessionManager>(SESSION_MANAGER_SERVICE_NAME)
     const maxSteps = Number(config?.maxSteps ?? 6)
 
     ctx.provide<AgentLoopService>(AGENT_LOOP_SERVICE_NAME, {
       async run(prompt, model) {
+        // 可选依赖在使用时解析：并发启动下 apply 时它可能尚未就绪。
+        const checkpoint = ctx.get<CheckpointService>(CHECKPOINT_SERVICE_NAME)
+        const session = manager.active
         session.append({ type: 'user/message', text: prompt })
 
         for (let step = 0; step < maxSteps; step += 1) {
           // 安全点：请求模型之前保证历史已落盘。
-          // 崩溃最多丢掉这次请求之后的内容，不会丢掉整段对话。
           await checkpoint?.at('before-model-request')
 
-          // 每次请求都从日志重算，不在内存里维护第二份对话状态。
           const result: LLMResult = await llm.chat({
             messages: toChatMessages(session.events()),
             tools: tools.list().map((tool) => ({

@@ -7,19 +7,18 @@
 import { join } from 'node:path'
 import { app } from 'electron'
 import { createRoot, type Context } from '@pkg/cordis'
-import { SESSION_SERVICE_NAME, type SessionService, type SessionStore } from '@pkg/session'
+import { SESSION_MANAGER_SERVICE_NAME, type SessionManager } from '@pkg/session'
 import { AGENT_LOOP_SERVICE_NAME, type AgentLoopService } from '@pkg/runtime'
 import { pluginManifest } from '@pkg/agent-assistant'
-import { jsonlStore } from '@pkg/session'
 import { loadModels } from './service/storage/index.ts'
 
 export interface Booted {
   root: Context
-  store: SessionStore
-  session: SessionService
+  manager: SessionManager
   loop: AgentLoopService
   plugins: string[]
-  sessionPath: string
+  /** 会话根目录；每个会话一个子目录。 */
+  sessionsRoot: string
   /** 文件类工具的沙箱根目录；启动时确定，IPC 与工具共用这一份。 */
   workingDir: string
 }
@@ -35,22 +34,24 @@ async function doBoot(): Promise<Booted> {
   })
 
   const workingDir = process.cwd()
-  const sessionRoot = join(app.getPath('userData'), 'sessions')
-  const store = jsonlStore({ root: sessionRoot, id: 'default' })
-  for (const entry of pluginManifest(store, loadModels, workingDir)) {
-    await root.use(entry.plugin, entry.config)
-  }
+  const sessionsRoot = join(app.getPath('userData'), 'sessions')
 
-  const session = root.require<SessionService>(SESSION_SERVICE_NAME)
+  // 并发启动：每个插件自行 wait(inject)，顺序与加载结果无关。
+  await Promise.all(
+    pluginManifest(sessionsRoot, loadModels, workingDir).map((entry) =>
+      root.use(entry.plugin, entry.config),
+    ),
+  )
+
+  const manager = root.require<SessionManager>(SESSION_MANAGER_SERVICE_NAME)
   const loop = root.require<AgentLoopService>(AGENT_LOOP_SERVICE_NAME)
   return {
     root,
-    store,
-    session,
+    manager,
     loop,
     plugins,
     workingDir,
-    sessionPath: join(sessionRoot, 'default', 'v1.jsonl'),
+    sessionsRoot,
   }
 }
 
@@ -60,11 +61,9 @@ export function ensureBooted(): Promise<Booted> {
   return booting
 }
 
-/** teardown 时消费：flush → close store → close root。 */
+/** teardown 时消费：manager 内部已在 effect 里 flush + close 所有会话，只需 close root。 */
 export async function teardown(): Promise<void> {
   const booted = await booting?.catch(() => undefined)
   if (booted === undefined) return
-  await booted.session.flush()
-  await booted.store.close()
   booted.root.close()
 }

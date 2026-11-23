@@ -5,10 +5,10 @@
  * 插件卸载时工具自动消失，不需要任何反向登记表。
  */
 
-import type { Plugin } from '@pkg/cordis'
+import type { PluginObject } from '@pkg/cordis'
 import { TOOLS_SERVICE_NAME, type Tool, type ToolRegistry } from './types.ts'
 
-export const toolsPlugin: Plugin = {
+export const toolsPlugin: PluginObject = {
   name: 'tools',
   apply(ctx) {
     const tools = new Map<string, Tool>()

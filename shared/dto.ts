@@ -14,6 +14,8 @@ export interface ChatRequest {
   text: string
   /** UI 选定的模型（modelId）；后端按请求时点最新配置解析，找不到报错。 */
   model: string
+  /** 本轮写入的会话 id；后端会切换 active session 并写事件到该会话。 */
+  sessionId: string
 }
 
 /** chat 只表示本轮完成；本轮事件经 IPC broadcast 推送，历史经 sessions API 拉取。 */
@@ -37,9 +39,29 @@ export interface ModelsPutResponse {
 
 export interface SessionSummary {
   id: string
-  /** 最后一条事件的时间（epoch ms）；0 表示无事件或旧日志时间未知。 */
+  /** 展示标题：用户重命名 > 首条用户消息 > 「会话 xxxxxx」。 */
+  title: string
+  /** 最后一条事件的时间（epoch ms）；0 表示无事件。 */
   lastActive: number
+  /** 最后一条消息的截断文本，供列表辅助展示。 */
   preview: string
+}
+
+export interface SessionCreateResponse {
+  id: string
+}
+
+export interface SessionRenameRequest {
+  title: string
+}
+
+export interface SessionRenameResponse {
+  id: string
+  title: string
+}
+
+export interface SessionDeleteResponse {
+  id: string
 }
 
 export type SessionsListResponse = SessionSummary[]

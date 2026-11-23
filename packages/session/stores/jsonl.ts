@@ -1,12 +1,10 @@
 /**
  * 存储 Provider 之一：追加式 JSONL 文件。
- * 对应真实仓库 packages/session/session-persistence-jsonl。
  *
  * 三个工程要点：
- * 1. 格式版本写进文件名，新代码不会误读旧文件。
+ * 1. 格式版本写进文件名，避免未来不兼容。
  * 2. 追加写只可能损坏最后一行，读取时丢弃尾部不完整记录即可。
- * 3. 同一会话只允许一个写者：第二条路径打开时直接失败，不排队也不合并。
- *    锁内记录 PID，持有者已被强杀（锁未释放但没有活跃进程）时可以安全接管。
+ * 3. 同一会话只允许一个写者：锁内记录 PID，持有者已被强杀时可以安全接管。
  */
 
 import { appendFile, link, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -44,34 +42,35 @@ export function jsonlStore(options: JsonlStoreOptions): SessionStore {
       for (const line of text.split('\n')) {
         if (line === '') continue
         try {
-          const event = JSON.parse(line) as SessionEvent
-          // 旧日志可能缺 ts（后加字段）；回退 0 表示「时间未知」，读取即完成迁移。
-          events.push(typeof event.ts === 'number' ? event : { ...event, ts: 0 })
+          events.push(JSON.parse(line) as SessionEvent)
         } catch {
-          // 崩溃时最后一行可能只写了一半；日志是事实源，尾部残缺即丢弃。
+          // 崩溃时最后一行可能只写了一半；尾部残缺即丢弃。
           console.warn(`[session] ${logPath}: 丢弃损坏的日志行: ${line.slice(0, 80)}`)
         }
       }
       return events
     },
+
     async append(batch) {
       if (batch.length === 0) return
       const lines = batch.map((event) => JSON.stringify(event)).join('\n')
       try {
         await appendFile(logPath, `${lines}\n`, 'utf8')
       } catch (error) {
-        // 持久化失败转成域错误：边界映射进 envelope，UI 才能读到消息并常驻告警。
         const code = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN'
         const detail = error instanceof Error ? error.message : String(error)
         throw new StorageError(`会话保存失败（${code}）：${detail}`, code)
       }
     },
+
     async close() {
       if (!locked) return
       locked = false
       await rm(lockPath, { force: true })
     },
   }
+
+  // ---------------------------------------------------------------------------
 
   async function acquireLock(): Promise<void> {
     if (locked) return
@@ -85,7 +84,7 @@ export function jsonlStore(options: JsonlStoreOptions): SessionStore {
           'If that process is gone, delete the lock file and retry.',
         )
       }
-      // 持有者被强杀时不会执行 close()，留下的锁可以接管。
+      // 持有者已被强杀时会留下锁文件；检测到 stale 后接管。
       await rm(lockPath, { force: true })
       await writeLockFile()
     }
@@ -93,9 +92,7 @@ export function jsonlStore(options: JsonlStoreOptions): SessionStore {
   }
 
   async function writeLockFile(): Promise<void> {
-    // PID 先落临时文件，再硬链接原子占位（目标已存在则 EEXIST）：
-    // 锁文件要么不存在、要么内容完整，消除「先建空文件再异步写 PID」的空窗——
-    // 否则并发读者会把空锁判成 stale 而接管，造成双写者。
+    // 临时文件 + 硬链接原子占位，消除「先建空文件再异步写 PID」的空窗。
     const tmpPath = `${lockPath}.${process.pid}.tmp`
     await writeFile(tmpPath, String(process.pid), 'utf8')
     try {
@@ -108,7 +105,6 @@ export function jsonlStore(options: JsonlStoreOptions): SessionStore {
   async function isLockStale(): Promise<boolean> {
     const text = await readFile(lockPath, 'utf8').catch(() => '')
     const pid = Number.parseInt(text, 10)
-    // 旧版本留下的空锁同样没有可确认的持有者。
     if (!Number.isInteger(pid) || pid <= 0) return true
     try {
       process.kill(pid, 0)

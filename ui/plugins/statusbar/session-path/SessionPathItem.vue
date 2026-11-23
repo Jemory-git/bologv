@@ -4,11 +4,11 @@ import { BRIDGE_SERVICE, type BridgeService } from '@ui/plugins/core/electron-br
 import { useService } from '@ui/use'
 
 const bridge = useService<BridgeService>(BRIDGE_SERVICE)
-const sessionPath = computed(() => bridge.bootInfo.value?.sessionPath ?? null)
+const sessionsRoot = computed(() => bridge.bootInfo.value?.sessionsRoot ?? null)
 </script>
 
 <template>
-  <span class="item" :title="sessionPath ?? undefined">{{ sessionPath ?? '—' }}</span>
+  <span class="item" :title="sessionsRoot ?? undefined">{{ sessionsRoot ?? '—' }}</span>
 </template>
 
 <style scoped>

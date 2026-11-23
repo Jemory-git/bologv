@@ -6,7 +6,7 @@
  * apiKey 通过环境变量名（apiKeyEnv）解析，不存明文。
  */
 
-import type { Plugin } from '@pkg/cordis'
+import type { PluginObject } from '@pkg/cordis'
 import { ApiKeyMissingError, LLM_SERVICE_NAME, ModelNotFoundError } from '@pkg/llm'
 import { fetchModel, type ModelConfig } from '@pkg/http'
 import type { ChatRequest, LLMService, Vendor } from '../types.ts'
@@ -33,7 +33,7 @@ function resolveApiKey(vendor: Vendor): string | undefined {
   return process.env[envName]
 }
 
-export const deepseekLLM: Plugin = {
+export const deepseekLLM: PluginObject = {
   name: 'deepseek-llm',
   apply(ctx, config) {
     const { getVendors } = (config ?? {}) as unknown as PluginConfig

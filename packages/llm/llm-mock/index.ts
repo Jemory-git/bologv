@@ -6,10 +6,10 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Plugin } from '@pkg/cordis'
+import type { PluginObject } from '@pkg/cordis'
 import { LLM_SERVICE_NAME, type LLMService } from '@pkg/llm'
 
-export const mockLLM: Plugin = {
+export const mockLLM: PluginObject = {
   name: 'mock-llm',
   apply(ctx) {
     const service: LLMService = {

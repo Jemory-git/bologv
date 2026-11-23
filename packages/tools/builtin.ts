@@ -7,7 +7,7 @@
 
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
-import type { Plugin } from '@pkg/cordis'
+import type { PluginObject } from '@pkg/cordis'
 import { TOOLS_SERVICE_NAME, type Tool, type ToolRegistry } from './types.ts'
 
 const MAX_OUTPUT_CHARS = 2000
@@ -58,7 +58,7 @@ const nowTool: Tool = {
   },
 }
 
-export const builtinToolsPlugin: Plugin = {
+export const builtinToolsPlugin: PluginObject = {
   name: 'builtin-tools',
   inject: [TOOLS_SERVICE_NAME],
   apply(ctx, config) {

@@ -20,7 +20,7 @@ export const IPC = {
 // Boot 通道
 export interface BootResponse {
   plugins: string[]
-  sessionPath: string
+  sessionsRoot: string
   workingDir: string
 }
 

@@ -19,7 +19,7 @@ export function registerIpc(): void {
     const booted = await ensureBooted()
     return {
       plugins: booted.plugins,
-      sessionPath: booted.sessionPath,
+      sessionsRoot: booted.sessionsRoot,
       workingDir: booted.workingDir,
     }
   })

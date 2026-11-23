@@ -103,12 +103,8 @@
     }
     error.value = null
     saving.value = true
-    const [httpErr, body] = await setVendors({ vendors })
+    const [, body] = await setVendors({ vendors })
     saving.value = false
-    if (httpErr) {
-      error.value = `保存失败：${httpErr.message}`
-      return
-    }
     if (body.code !== 0) {
       error.value = `保存失败：${body.msg || 'api error'}`
       return
