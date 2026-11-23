@@ -7,7 +7,7 @@
 <template>
   <div class="sidebar-header">
     <div class="brand">
-      <span class="name">Bologui</span>
+      <span class="name">Bologv</span>
     </div>
   </div>
 </template>

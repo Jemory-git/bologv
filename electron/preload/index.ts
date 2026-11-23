@@ -12,7 +12,7 @@ import { IPC } from '../types/ipc.ts'
 
 import type { WindowControlAction } from '../types/ipc.ts'
 
-contextBridge.exposeInMainWorld('bologui', {
+contextBridge.exposeInMainWorld('bologv', {
   // boot 信息：插件列表、会话路径、工作目录
   boot: () => ipcRenderer.invoke(IPC.boot),
 

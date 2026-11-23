@@ -1,5 +1,5 @@
 # demo 运行期产生的会话日志与写者锁
-.bologui/
+.bologv/
 
 # Electron 依赖、构建产物与打包输出
 node_modules/

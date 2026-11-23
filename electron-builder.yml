@@ -1,5 +1,5 @@
-appId: dev.bologui.app
-productName: bologui
+appId: dev.bologv.app
+productName: bologv
 directories:
   output: dist-pkg
 files:
@@ -10,7 +10,7 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: bologui-Setup-${version}.${ext}
+  artifactName: bologv-Setup-${version}.${ext}
 nsis:
   oneClick: false
   perMachine: false

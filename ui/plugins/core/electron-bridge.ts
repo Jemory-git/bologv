@@ -1,5 +1,5 @@
 /**
- * electron-bridge 插件：把 preload 暴露的 window.bologui 包装成 Cordis 服务。
+ * electron-bridge 插件：把 preload 暴露的 window.bologv 包装成 Cordis 服务。
  *
  * 职责：
  *   1. 一次性拉取 BootInfo，并暴露响应式的 bootInfo 字段
@@ -39,9 +39,9 @@ export interface BridgeService {
 export const electronBridge: Plugin = {
   name: 'electronBridge',
   apply(ctx) {
-    const api = window.bologui
+    const api = window.bologv
     if (api === undefined) {
-      throw new Error('window.bologui 不可用：请通过 Electron 外壳启动 Web UI')
+      throw new Error('window.bologv 不可用：请通过 Electron 外壳启动 Web UI')
     }
 
     const bootInfo = shallowRef<BootInfo | null>(null)

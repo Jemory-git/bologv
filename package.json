@@ -1,9 +1,9 @@
 {
-  "name": "bologui",
+  "name": "bologv",
   "version": "0.1.0",
   "private": true,
   "description": "基于简化 Cordis 内核的 agent 开发基础：Electron 外壳 + Koa 提供的 Web UI",
-  "author": "bologui",
+  "author": "bologv",
   "type": "module",
   "main": "dist/main.mjs",
   "engines": {

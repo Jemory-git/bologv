@@ -8,7 +8,7 @@ import type { InjectionKey } from 'vue'
 import type { Context } from '@pkg/cordis'
 
 /** 组件树里注入 Cordis 作用域的 key。 */
-export const CONTEXT_SERVICE: InjectionKey<Context> = Symbol('bologui-context')
+export const CONTEXT_SERVICE: InjectionKey<Context> = Symbol('bologv-context')
 
 /**
  * 取用一项已提供的服务。
