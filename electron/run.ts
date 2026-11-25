@@ -27,7 +27,8 @@ export interface RunOptions {
 
 export function run(options: RunOptions): void {
   void app.whenReady().then(async () => {
-    registerIpc()
+    const uiUrl = options.getUiUrl()
+    registerIpc({ uiUrl })
 
     // Cordis 事件 → Electron window broadcast
     options.booted.root.on('plugin/ready', (name) => broadcast(IPC.ready, String(name)))
@@ -38,7 +39,6 @@ export function run(options: RunOptions): void {
       ? undefined
       : watchPluginSources(() => broadcast(IPC.pluginsChanged, Date.now()))
 
-    const uiUrl = options.getUiUrl()
     createWindow({ uiUrl, preloadPath: options.preloadPath })
 
     app.on('activate', () => {

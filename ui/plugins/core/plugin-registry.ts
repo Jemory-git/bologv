@@ -1,5 +1,5 @@
 /**
- * 插件注册中心：统一清单 + 启停管理器。
+ * 插件注册中心：统一清单 + 启停管理器 + 固定插件装配点。
  *
  * 清单有两个来源（见 types.ts）：
  *   - 内置：builtin.ts 的静态常量，编译期已存在；
@@ -9,9 +9,9 @@
  *   enable  → 解析插件对象 → ctx.use() → 记下 scope
  *   disable → scope.dispose() → 插槽注册与视图随之消失
  *
- * 固定插件（builtin.fixed）由 main.ts 直接 use，registry 只把它们标记为已启用。
- *
- * import 顺序：pluginRegistry 必须在所有固定插件之前 use。
+ * 固定插件（builtin.fixed）是这条生命周期的自动启用分支：
+ * 启动时由本插件按清单顺序逐个 use，之后不可停用。
+ * 因此 main.ts 只需要 use(pluginRegistry)，不再逐个装配固定插件。
  */
 
 import { ref, shallowReactive } from 'vue'
@@ -66,7 +66,7 @@ const BUILTIN_IDS = new Set(BUILTIN_PLUGINS.map((meta) => meta.id))
 
 export const pluginRegistry: Plugin = {
   name: 'plugin-registry',
-  apply(ctx) {
+  async apply(ctx) {
     const catalog = shallowReactive<UiPluginMeta[]>([...BUILTIN_PLUGINS])
     const activeIds = shallowReactive(new Set<string>())
     const loadErrors = shallowReactive(new Map<string, string>())
@@ -76,6 +76,15 @@ export const pluginRegistry: Plugin = {
     const pending = new Set<string>()
     const scanning = ref(false)
     const externalDir = ref('')
+
+    // —— 启动：固定插件由 registry 统一装配 ——
+    // 清单顺序即装配顺序：electronBridge 必须先就位，下面的 refreshExternal 才能取到桥接服务。
+    // 固定插件不得 inject 本 registry 服务 —— 此时服务尚未 provide（它依赖桥接，必须后建）。
+    for (const meta of catalog) {
+      if (meta.origin !== 'builtin' || !meta.fixed) continue
+      await ctx.use(meta.plugin)
+      activeIds.add(meta.id)
+    }
 
     // —— 查询 ——
 
@@ -219,12 +228,6 @@ export const pluginRegistry: Plugin = {
       } finally {
         scanning.value = false
       }
-    }
-
-    // —— 启动：固定插件先备案，其余按持久化 / 默认值启用 ——
-
-    for (const meta of catalog) {
-      if (meta.origin === 'builtin' && meta.fixed) activeIds.add(meta.id)
     }
 
     // —— 开发模式热重载：主进程监听源码目录，变化后重扫并重载运行中的外置插件 ——

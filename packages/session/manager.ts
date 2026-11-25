@@ -1,12 +1,12 @@
 /**
  * 会话管理器：唯一挂进 Cordis 的会话服务。
  *
- * 每个会话是一个独立闭包（由 createSessionService 产生），
- * 各自有事件数组、flush 链、pending 队列。SessionManager 只做：
- *   1. 按 id 创建 / 缓存会话实例（onEvent 回调让每个 SessionService 产出的事件都 emit 到 Cordis root）
- *   2. 记录活跃 id（activeId）
- *   3. 维护 per-session 单飞锁（isRunning / setRunning）
- *   4. 扫描 sessions 目录列出磁盘上的会话
+ * 两类访问严格分开：
+ *   - 摘要 / 历史读取：只读文件，不创建实例、不持写者锁
+ *   - 运行时：按需加载实例（SessionService + store），并维护 per-session 单飞锁
+ *
+ * 实例生命周期：切换活跃会话时加载目标、释放上一个空闲实例；
+ * 运行中的实例保留到本轮结束（finishRun），避免后台任务失去写入通道。
  */
 
 import { mkdir, readdir, rm } from 'node:fs/promises'
@@ -14,13 +14,16 @@ import { join } from 'node:path'
 import type { PluginObject } from '@pkg/cordis'
 import { jsonlStore } from './stores/jsonl.ts'
 import { readSessionMeta, writeSessionMeta } from './meta.ts'
+import { factsFromEvents, readLogEvents, readSessionFacts } from './facts.ts'
 import { createSessionService, awaitSessionReady } from './session.ts'
-import type { SessionEvent, SessionManager, SessionService } from './types.ts'
+import type { SessionEvent, SessionFacts, SessionManager, SessionService } from './types.ts'
 import { SESSION_MANAGER_SERVICE_NAME } from './types.ts'
 
 interface InternalEntry {
   store: ReturnType<typeof jsonlStore>
   service: SessionService
+  /** 存储加载（含取得写者锁）的就绪 Promise；未就绪前不得追加事件。 */
+  ready: Promise<void>
   running: boolean
 }
 
@@ -60,13 +63,38 @@ export const sessionManagerPlugin: PluginObject = {
 
     async function ensureLoaded(id: string): Promise<InternalEntry> {
       const existing = entries.get(id)
-      if (existing !== undefined) return existing
+      if (existing !== undefined) {
+        await existing.ready
+        return existing
+      }
       const store = jsonlStore({ root: sessionsRoot, id })
       const service = createSessionService(store, { sessionId: id, onEvent: emitSessionEvent })
-      await awaitSessionReady(service)
-      const entry: InternalEntry = { store, service, running: false }
+      const ready = awaitSessionReady(service)
+      const entry: InternalEntry = { store, service, ready, running: false }
       entries.set(id, entry)
+      try {
+        await ready
+      } catch (error) {
+        // 加载失败（例如锁冲突）不保留半就绪实例，避免后续调用拿到坏状态。
+        entries.delete(id)
+        throw error
+      }
       return entry
+    }
+
+    /**
+     * 释放空闲实例：flush + close + 移出缓存。
+     * 运行中的会话与当前活跃会话不释放。
+     */
+    async function release(id: string): Promise<void> {
+      const entry = entries.get(id)
+      if (entry === undefined || entry.running || activeId === id) return
+      entries.delete(id)
+      try {
+        await entry.service.flush()
+      } finally {
+        await entry.store.close()
+      }
     }
 
     const manager: SessionManager = {
@@ -76,7 +104,10 @@ export const sessionManagerPlugin: PluginObject = {
       },
 
       get active(): SessionService {
-        return this.get(this.activeId)
+        const id = this.activeId
+        const entry = entries.get(id)
+        if (entry === undefined) throw new Error(`sessionManager: session "${id}" is not loaded`)
+        return entry.service
       },
 
       async list(): Promise<string[]> {
@@ -90,25 +121,29 @@ export const sessionManagerPlugin: PluginObject = {
         return [...seen].sort((a, b) => b.localeCompare(a))
       },
 
-      get(id): SessionService {
+      async summarize(id): Promise<SessionFacts> {
+        const title = await this.getTitle(id)
         const entry = entries.get(id)
-        if (entry !== undefined) return entry.service
-        // 同步创建未缓存会话：典型流程会先 ensureLoaded 或 create，
-        // 这里只作为 get 时的兜底（store.load() 会在后台异步完成）。
-        const store = jsonlStore({ root: sessionsRoot, id })
-        const service = createSessionService(store, { sessionId: id, onEvent: emitSessionEvent })
-        const entry2: InternalEntry = { store, service, running: false }
-        entries.set(id, entry2)
-        return service
+        // 驻留实例的内存事件比文件更新（可能尚未 flush），优先使用。
+        if (entry !== undefined) return factsFromEvents(id, entry.service.events(), title)
+        return readSessionFacts(sessionsRoot, id)
+      },
+
+      async readEvents(id): Promise<readonly SessionEvent[]> {
+        const entry = entries.get(id)
+        if (entry !== undefined) return entry.service.events()
+        return readLogEvents(sessionsRoot, id)
       },
 
       create() {
         const id = genSessionId()
         const store = jsonlStore({ root: sessionsRoot, id })
         const service = createSessionService(store, { sessionId: id, onEvent: emitSessionEvent })
-        const entry: InternalEntry = { store, service, running: false }
+        const ready = awaitSessionReady(service)
+        const entry: InternalEntry = { store, service, ready, running: false }
         entries.set(id, entry)
-        void awaitSessionReady(service)
+        // 失败由后续 ensureLoaded 统一抛出；这里只避免未处理的 rejection。
+        void ready.catch(() => {})
         return { id, service }
       },
 
@@ -136,17 +171,31 @@ export const sessionManagerPlugin: PluginObject = {
         if (activeId === id) activeId = null
       },
 
-      switchActive(id): void {
+      async switchActive(id): Promise<void> {
+        if (activeId === id) return
+        await ensureLoaded(id)
+        const previous = activeId
         activeId = id
+        if (previous !== null) await release(previous)
+      },
+
+      async beginRun(id): Promise<boolean> {
+        const entry = await ensureLoaded(id)
+        if (entry.running) return false
+        entry.running = true
+        return true
+      },
+
+      async finishRun(id): Promise<void> {
+        const entry = entries.get(id)
+        if (entry === undefined) return
+        entry.running = false
+        // 切走的会话在本轮结束后立刻回收；活跃会话保留。
+        if (activeId !== id) await release(id)
       },
 
       isRunning(id): boolean {
         return entries.get(id)?.running ?? false
-      },
-
-      setRunning(id, value): void {
-        const entry = entries.get(id)
-        if (entry !== undefined) entry.running = value
       },
     }
 

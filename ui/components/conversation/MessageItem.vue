@@ -1,8 +1,22 @@
 <script setup lang="ts">
 /**
  * 单条对话消息：用户靠右，助手靠左并带标识。
+ * 用户消息可携带参考文件，平铺展示名称与「类别 + 同类序号」徽标。
  */
-defineProps<{ role: 'user' | 'assistant'; text: string }>()
+import { computed } from 'vue'
+import { referenceLabels } from '@pkg/session/types.ts'
+import ReferenceCard from './reference/ReferenceCard.vue'
+import type { ReferenceMeta } from '@pkg/session/types.ts'
+
+//states
+const props = defineProps<{
+  role: 'user' | 'assistant'
+  text: string
+  references?: ReferenceMeta[]
+}>()
+
+/** 与投影时模型看到的「图片 1」一一对应。 */
+const labels = computed(() => referenceLabels(props.references ?? []))
 </script>
 
 <template>
@@ -10,7 +24,11 @@ defineProps<{ role: 'user' | 'assistant'; text: string }>()
     <span v-if="role === 'assistant'" class="avatar" aria-hidden="true">d</span>
     <div class="bubble">
       <span class="who">{{ role === 'user' ? '你' : 'BLG' }}</span>
-      <p>{{ text }}</p>
+      <p v-if="text !== ''">{{ text }}</p>
+      <div v-if="references !== undefined && references.length > 0" class="refs">
+        <ReferenceCard v-for="(reference, index) in references" :key="reference.path" :reference="reference"
+          :label="labels[index] ?? ''" />
+      </div>
     </div>
   </div>
 </template>
@@ -20,7 +38,7 @@ defineProps<{ role: 'user' | 'assistant'; text: string }>()
   display: flex;
   align-items: flex-start;
   gap: 0.8rem;
-  max-width: min(86%, 72rem);
+  max-width: min(86%, 100rem);
 }
 
 .message.user {
@@ -73,5 +91,12 @@ p {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
 }
 </style>

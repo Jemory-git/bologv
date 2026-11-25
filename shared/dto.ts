@@ -5,13 +5,22 @@
  * 路由 handler 和 ui/http 的客户端函数签名共同消费这份。
  */
 
-import type { SessionEvent } from '@pkg/session/types.ts'
+import type { ReferenceMeta, SessionEvent } from '@pkg/session/types.ts'
 import type { Vendor } from '@pkg/llm/types.ts'
 
 // —— Chat ——
 
 export interface ChatRequest {
+  /** 文本可以为空，但必须与 referencePaths 至少有一项。 */
   text: string
+  /**
+   * 参考文件的绝对路径，按输入框中的展示顺序排列。
+   *
+   * 只传路径、不传别名：类别（按扩展名）与「第几张」都从「路径 + 数组顺序」派生，
+   * 服务端投影时会为每项生成模型可见标记，如「【参考文件 #2：图片 1「cat.png」】」，
+   * 因此用户说「图片一 / 第三张图片 / cat.png」都能对上。
+   */
+  referencePaths: string[]
   /** UI 选定的模型（modelId）；后端按请求时点最新配置解析，找不到报错。 */
   model: string
   /** 本轮写入的会话 id；后端会切换 active session 并写事件到该会话。 */
@@ -21,6 +30,23 @@ export interface ChatRequest {
 /** chat 只表示本轮完成；本轮事件经 IPC broadcast 推送，历史经 sessions API 拉取。 */
 export interface ChatResponse {
   ok: true
+}
+
+// —— References ——
+
+/** 检查本地文件路径，返回可用的元信息与逐条错误。 */
+export interface InspectReferencesRequest {
+  paths: string[]
+}
+
+export interface ReferenceInspectionError {
+  path: string
+  message: string
+}
+
+export interface InspectReferencesResponse {
+  references: ReferenceMeta[]
+  errors: ReferenceInspectionError[]
 }
 
 // —— Models ——

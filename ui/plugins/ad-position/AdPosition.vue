@@ -1,6 +1,6 @@
 <template>
   <div class="ad-position">
-    <img src="" alt="">
+    <img src="http://118.178.167.186/statics/gv.gif" alt="">
   </div>
 </template>
 
@@ -8,6 +8,7 @@
 .ad-position {
   width: 100%;
   aspect-ratio: 2;
-  background-color: #fff;
+  display: flex;
+  place-content: center;
 }
 </style>

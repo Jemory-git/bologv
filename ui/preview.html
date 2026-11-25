@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!-- 独立预览入口：不启动插件树，只渲染一个参考文件；blob: 供图片 object URL 使用。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:"
+    />
+    <title>参考文件预览</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/preview/main.ts"></script>
+  </body>
+</html>

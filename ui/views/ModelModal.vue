@@ -2,7 +2,7 @@
   /**
    * 模型配置：两层结构，全部来自/写入 settings/models.json
    *   Vendor  → 厂商：baseURL + apiKeyEnv（环境变量名）
-   *   ModelDef → 模型：modelId + path，归属某个 vendor
+   *   ModelDef → 模型：modelId + path + 类别与输入模态，归属某个 vendor
    *
    * 数据源是 models store：打开时 load() 取最新配置做本地草稿；
    * 保存成功后再 load() 刷新 store，选中模型即时生效。
@@ -12,14 +12,29 @@
 
   // ———————————— imports ————————————
   import { computed, onMounted, reactive, ref, toRaw } from 'vue'
+  import { MODALITIES, MODEL_CATEGORIES } from '@pkg/llm/types.ts'
   import { setVendors } from '@ui/http'
   import { useModelsStore } from '@ui/stores/models.ts'
+
   import type { Ref } from 'vue'
-  import type { Vendor } from '@pkg/llm/types.ts'
+  import type { Modality, ModelCategory, Vendor } from '@pkg/llm/types.ts'
 
   // ============================================================================
   // states
   // ============================================================================
+
+  const categoryLabels: Record<ModelCategory, string> = {
+    language: '语言模型',
+    image: '图片模型',
+    audio: '语音模型',
+    video: '视频模型',
+  }
+  const modalityLabels: Record<Modality, string> = {
+    text: '文本',
+    image: '图片',
+    audio: '音频',
+    video: '视频',
+  }
 
   const models = useModelsStore()
 
@@ -69,7 +84,13 @@
   function addModel(vendorId: string): void {
     const v = vendors.find((v) => v.id === vendorId)
     if (!v) return
-    v.models.push({ id: uid(), modelId: '', path: '' })
+    v.models.push({
+      id: uid(),
+      modelId: '',
+      path: '',
+      category: 'language',
+      inputModalities: ['text'],
+    })
   }
 
   function removeModel(vendorId: string, modelId: string): void {
@@ -90,6 +111,7 @@
       for (const m of v.models) {
         if (!m.modelId.trim()) return `厂商 ${v.name} 有未填写 modelId 的模型`
         if (!m.path.startsWith('/')) return `模型 ${m.modelId || '(未填)'} 的 path 必须以 / 开头`
+        if (m.inputModalities.length === 0) return `模型 ${m.modelId || '(未填)'} 至少需要选择一种输入模态`
       }
     }
     return null
@@ -114,7 +136,7 @@
       error.value = refreshErr
       return
     }
-    emit('close')
+    // emit('close')
   }
 
   // ============================================================================
@@ -201,25 +223,46 @@
           <button type="button" class="btn btn-ghost btn-small" @click="addModel(selected.id)">+ 新增模型</button>
         </div>
 
-        <div v-if="selected.models.length > 0" class="models-table-wrap">
-          <table class="models-table">
-            <thead>
-              <tr>
-                <th>Model ID</th>
-                <th>Path</th>
-                <th class="col-actions"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in selected.models" :key="m.id">
-                <td><input v-model="m.modelId" type="text" class="input input-sm" placeholder="deepseek-chat" /></td>
-                <td><input v-model="m.path" type="text" class="input input-sm" placeholder="/chat/completions" /></td>
-                <td class="col-actions">
-                  <button type="button" class="btn-row-del" title="删除" @click="removeModel(selected.id, m.id)">✕</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="selected.models.length > 0" class="model-list">
+          <article v-for="m in selected.models" :key="m.id" class="model-card">
+            <div class="model-main">
+              <label class="field">
+                <span class="field-label">Model ID</span>
+                <input v-model="m.modelId" type="text" class="input input-sm" placeholder="deepseek-chat" />
+              </label>
+              <label class="field">
+                <span class="field-label">Path</span>
+                <input v-model="m.path" type="text" class="input input-sm" placeholder="/chat/completions" />
+              </label>
+              <label class="field category-field">
+                <span class="field-label">模型类别</span>
+                <select v-model="m.category" class="input input-sm select">
+                  <option v-for="category in MODEL_CATEGORIES" :key="category" :value="category">
+                    {{ categoryLabels[category] }}
+                  </option>
+                </select>
+              </label>
+              <button type="button" class="model-delete" title="删除模型" @click="removeModel(selected.id, m.id)">✕</button>
+            </div>
+
+            <div class="modality-config">
+              <div class="modality-heading">
+                <span class="field-label">输入模态</span>
+                <span v-if="m.inputModalities.length > 1" class="multimodal-badge">多模态输入</span>
+              </div>
+              <div class="modality-options">
+                <label
+                  v-for="modality in MODALITIES"
+                  :key="modality"
+                  class="modality-option"
+                  :class="{ checked: m.inputModalities.includes(modality) }"
+                >
+                  <input v-model="m.inputModalities" type="checkbox" :value="modality" />
+                  <span>{{ modalityLabels[modality] }}</span>
+                </label>
+              </div>
+            </div>
+          </article>
         </div>
         <p v-else class="empty-hint">还没有模型，点击「+ 新增模型」</p>
       </div>
@@ -406,67 +449,116 @@
         }
       }
 
-      .models-table-wrap {
-        border: 0.1rem solid var(--line);
-        border-radius: 0.6rem;
-        overflow: hidden;
-      }
+      .model-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
 
-      .models-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 1.2rem;
+        .model-card {
+          display: flex;
+          flex-direction: column;
+          gap: 1.2rem;
+          padding: 1.2rem;
+          border: 0.1rem solid var(--line);
+          border-radius: 0.6rem;
 
-        th,
-        td {
-          padding: 0.6rem 0.8rem;
-          text-align: left;
-          border-bottom: 0.1rem solid var(--line);
-        }
+          .model-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 11rem 3.2rem;
+            align-items: end;
+            gap: 1.2rem;
 
-        thead th {
-          background: var(--panel-2);
-          color: var(--muted);
-          font-weight: 500;
-          font-size: 1.1rem;
-        }
+            .field {
+              display: flex;
+              flex-direction: column;
+              gap: 0.6rem;
+              min-width: 0;
+            }
 
-        tbody {
-          tr:last-child td {
-            border-bottom: none;
+            .input {
+              height: 3.4rem;
+            }
+
+            .select {
+              cursor: pointer;
+            }
           }
 
-          tr:hover {
-            background: var(--panel-2);
-          }
-        }
-
-        .input {
-          min-width: 8rem;
-        }
-
-        .col-actions {
-          width: 3rem;
-          text-align: center;
-        }
-
-        .btn-row-del {
-          border: none;
-          background: transparent;
-          color: var(--muted);
-          font-size: 1rem;
-          cursor: pointer;
-          padding: 0.2rem 0.4rem;
-          border-radius: 0.3rem;
-          opacity: 0.3;
-
-          tr:hover & {
-            opacity: 1;
+          .field-label {
+            color: var(--muted);
+            font-size: 1.2rem;
           }
 
-          &:hover {
-            color: var(--fail);
-            opacity: 1;
+          .model-delete {
+            width: 3.2rem;
+            height: 3.4rem;
+            border-radius: 0.5rem;
+            color: var(--muted);
+            font-size: 1rem;
+            opacity: 0.3;
+
+            .model-card:hover & {
+              opacity: 1;
+            }
+
+            &:hover {
+              background: var(--panel-2);
+              color: var(--fail);
+              opacity: 1;
+            }
+          }
+
+          .modality-config {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            padding-top: 1.2rem;
+            border-top: 0.1rem solid var(--line);
+
+            .modality-heading {
+              display: flex;
+              align-items: center;
+              gap: 0.8rem;
+            }
+
+            .multimodal-badge {
+              padding: 0.1rem 0.6rem;
+              border-radius: 0.3rem;
+              background: var(--accent-soft);
+              color: var(--accent);
+              font-size: 1rem;
+            }
+
+            .modality-options {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 0.8rem;
+            }
+
+            .modality-option {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.5rem;
+              padding: 0.5rem 0.8rem;
+              border: 0.1rem solid var(--line);
+              border-radius: 0.5rem;
+              color: var(--muted);
+              font-size: 1.2rem;
+              cursor: pointer;
+
+              &.checked {
+                border-color: var(--accent-line);
+                background: var(--accent-soft);
+                color: var(--text);
+              }
+
+              input {
+                width: 1.2rem;
+                height: 1.2rem;
+                margin: 0;
+                accent-color: var(--accent);
+              }
+            }
           }
         }
       }

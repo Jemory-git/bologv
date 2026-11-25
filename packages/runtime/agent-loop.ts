@@ -5,6 +5,7 @@
  * 历史来自当前活跃会话（通过 SessionManager.active）。
  *
  * 检查点是可选依赖：没有加载持久化策略时，循环照常工作。
+ * 参考文件解析同样是可选依赖：由组合根注入，循环只负责把 id 交给它。
  */
 
 import type { PluginObject } from '@pkg/cordis'
@@ -12,14 +13,31 @@ import {
   CHECKPOINT_SERVICE_NAME,
   SESSION_MANAGER_SERVICE_NAME,
   type CheckpointService,
+  type ReferenceMeta,
+  type SessionEvent,
   type SessionManager,
 } from '@pkg/session'
-import { LLM_SERVICE_NAME, type LLMResult, type LLMService } from '@pkg/llm'
+import { LLM_SERVICE_NAME, type ChatContentPart, type LLMResult, type LLMService } from '@pkg/llm'
 import { TOOLS_SERVICE_NAME, type ToolRegistry } from '@pkg/tools'
-import { toChatMessages } from './message.ts'
+import { toChatMessages, type ReferenceParts } from './message.ts'
+
+/** 一次用户输入：文本可以为空，但文本与引用不能同时为空。 */
+export interface AgentInput {
+  text: string
+  references?: readonly ReferenceMeta[]
+}
+
+/**
+ * 把历史里出现过的引用批量转换成模型可见片段。
+ * 由组合根注入；没有注入时引用会显示为「内容不可用」。
+ */
+export type ReferencePartResolver = (
+  references: readonly ReferenceMeta[],
+  model: string,
+) => Promise<ReferenceParts>
 
 export interface AgentLoopService {
-  run(prompt: string, model: string): Promise<string>
+  run(input: AgentInput, model: string): Promise<string>
 }
 
 export const AGENT_LOOP_SERVICE_NAME = 'agentLoop'
@@ -32,20 +50,28 @@ export const agentLoopPlugin: PluginObject = {
     const tools = ctx.require<ToolRegistry>(TOOLS_SERVICE_NAME)
     const manager = ctx.require<SessionManager>(SESSION_MANAGER_SERVICE_NAME)
     const maxSteps = Number(config?.maxSteps ?? 6)
+    const resolveReferences = config?.resolveReferences as ReferencePartResolver | undefined
 
     ctx.provide<AgentLoopService>(AGENT_LOOP_SERVICE_NAME, {
-      async run(prompt, model) {
+      async run(input, model) {
         // 可选依赖在使用时解析：并发启动下 apply 时它可能尚未就绪。
         const checkpoint = ctx.get<CheckpointService>(CHECKPOINT_SERVICE_NAME)
         const session = manager.active
-        session.append({ type: 'user/message', text: prompt })
+        const references = input.references ?? []
+        session.append({
+          type: 'user/message',
+          text: input.text,
+          ...(references.length > 0 ? { references: [...references] } : {}),
+        })
 
         for (let step = 0; step < maxSteps; step += 1) {
           // 安全点：请求模型之前保证历史已落盘。
           await checkpoint?.at('before-model-request')
 
+          const events = session.events()
+          const parts = await resolveReferences?.(collectReferences(events), model) ?? new Map()
           const result: LLMResult = await llm.chat({
-            messages: toChatMessages(session.events()),
+            messages: toChatMessages(events, parts),
             tools: tools.list().map((tool) => ({
               name: tool.name,
               description: tool.description,
@@ -92,4 +118,19 @@ export const agentLoopPlugin: PluginObject = {
       },
     })
   },
+}
+
+/** 收集历史中出现过的引用，按路径去重并保持首次出现顺序。 */
+function collectReferences(events: readonly SessionEvent[]): ReferenceMeta[] {
+  const seen = new Set<string>()
+  const references: ReferenceMeta[] = []
+  for (const event of events) {
+    if (event.type !== 'user/message' || event.references === undefined) continue
+    for (const reference of event.references) {
+      if (seen.has(reference.path)) continue
+      seen.add(reference.path)
+      references.push(reference)
+    }
+  }
+  return references
 }

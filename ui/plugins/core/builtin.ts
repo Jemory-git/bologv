@@ -1,11 +1,10 @@
 /**
  * 内置插件清单：编译期静态存在，registry 随时可以 use。
  *
- * 固定插件（fixed: true）在 main.ts 里直接 use，registry 只负责把它们标记为已启用；
+ * 固定插件（fixed: true）由 registry 启动时统一 use，之后不可停用；
  * 其余条目由 registry 按持久化状态 / defaultEnabled 启停。
  *
- * import 顺序：pluginRegistry 必须在这些插件 use 之前，
- * 否则插件页首帧看不到完整内置清单。
+ * 清单顺序即固定插件的装配顺序：electronBridge 必须先于依赖桥接的 registry 内部逻辑。
  */
 
 import type { BuiltinPluginMeta } from './types.ts'
@@ -16,6 +15,7 @@ import { pluginsPage } from '@ui/plugins/plugins-page/plugins-page.ts'
 import { schedulesPage } from '@ui/plugins/schedules-page/schedules-page.ts'
 import { sessionPathItem } from '@ui/plugins/statusbar/session-path/session-path.ts'
 import { versionItem } from '@ui/plugins/statusbar/version/version.ts'
+import { reloadBtn } from '@ui/plugins/statusbar/reload/reload.ts'
 import { workingDirItem } from '@ui/plugins/statusbar/working-dir/working-dir.ts'
 import { adPosition } from '@ui/plugins/ad-position/ad-position.ts'
 
@@ -88,6 +88,14 @@ export const BUILTIN_PLUGINS: BuiltinPluginMeta[] = [
     label: '版本号',
     fixed: false,
     description: '状态栏条目',
+  },
+  {
+    origin: 'builtin',
+    id: reloadBtn.name,
+    plugin: reloadBtn,
+    label: '重新加载',
+    fixed: false,
+    description: '重新加载',
   },
 
   // —— 可切换插件（功能页）——

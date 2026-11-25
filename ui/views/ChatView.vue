@@ -22,9 +22,11 @@
   const status = useStatusStore()
 
   //methods
-  async function send(text: string): Promise<void> {
-    const value = text.trim()
-    if (value === '' || chat.pending) return
+  /** 文本与参考文件至少一项；参考文件只传本地路径。 */
+  async function send(payload: string | { text: string; referencePaths: string[] }): Promise<void> {
+    const text = typeof payload === 'string' ? payload.trim() : payload.text.trim()
+    const referencePaths = typeof payload === 'string' ? [] : payload.referencePaths
+    if ((text === '' && referencePaths.length === 0) || chat.pending) return
 
     const model = models.selectedModelId
     if (model === null) {
@@ -53,7 +55,7 @@
       chat.openSession(id)
     }
 
-    const [, body] = await httpChat({ text: value, model, sessionId })
+    const [, body] = await httpChat({ text, referencePaths, model, sessionId })
 
     if (body.code !== 0) {
       chat.appendError(`请求失败：${body.msg || 'api error'}`)

@@ -10,7 +10,7 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { deleteSession, getSessionEvents, getSessions, renameSession } from '@ui/http'
+import { deleteSession, getSessions, renameSession } from '@ui/http'
 import { useChatStore } from './chat.ts'
 import type { SessionSummary } from '@ui/types/view-model.ts'
 
@@ -39,7 +39,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   async function select(id: string): Promise<void> {
-    await useChatStore().switchSession(id, getSessionEvents)
+    await useChatStore().switchSession(id)
   }
 
   /** 新建对话 = 进入草稿态；真实会话在首条消息发送时创建。 */
@@ -72,7 +72,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
     const next = items.value[0]
     if (next === undefined) chat.startNew()
-    else await chat.switchSession(next.id, getSessionEvents)
+    else await chat.switchSession(next.id)
   }
 
   return { items, loading, error, load, select, startNew, rename, remove }

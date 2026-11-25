@@ -20,7 +20,7 @@ interface UiPluginBase {
 export interface BuiltinPluginMeta extends UiPluginBase {
   origin: 'builtin'
   plugin: Plugin
-  /** 固定插件由 main.ts 直接 use，registry 只标记为已启用。 */
+  /** 固定插件由 registry 启动时统一 use，不可停用。 */
   fixed: boolean
   /** 持久化缺失时的初始启用状态（仅可切换插件有效）。 */
   defaultEnabled?: boolean

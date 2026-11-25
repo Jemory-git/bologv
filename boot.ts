@@ -11,6 +11,7 @@ import { SESSION_MANAGER_SERVICE_NAME, type SessionManager } from '@pkg/session'
 import { AGENT_LOOP_SERVICE_NAME, type AgentLoopService } from '@pkg/runtime'
 import { pluginManifest } from '@pkg/agent-assistant'
 import { loadModels } from './service/storage/index.ts'
+import { resolveReferenceParts } from './service/references/resolve.ts'
 
 export interface Booted {
   root: Context
@@ -38,7 +39,7 @@ async function doBoot(): Promise<Booted> {
 
   // 并发启动：每个插件自行 wait(inject)，顺序与加载结果无关。
   await Promise.all(
-    pluginManifest(sessionsRoot, loadModels, workingDir).map((entry) =>
+    pluginManifest(sessionsRoot, loadModels, workingDir, resolveReferenceParts).map((entry) =>
       root.use(entry.plugin, entry.config),
     ),
   )

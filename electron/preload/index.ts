@@ -10,6 +10,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../types/ipc.ts'
 
+import type { ReferenceMeta } from '@pkg/session/types.ts'
 import type { WindowControlAction } from '../types/ipc.ts'
 
 contextBridge.exposeInMainWorld('bologv', {
@@ -19,6 +20,10 @@ contextBridge.exposeInMainWorld('bologv', {
   // 当前窗口控制与状态同步
   windowControl: (action: WindowControlAction) => ipcRenderer.invoke(IPC.windowControl, action),
   isWindowMaximized: () => ipcRenderer.invoke(IPC.windowIsMaximized),
+  // 参考文件：只返回本地绝对路径
+  pickReferenceFiles: () => ipcRenderer.invoke(IPC.pickReferences),
+  // 参考文件预览：主进程建窗，内容由预览窗口走同源 HTTP 拉取
+  previewReference: (reference: ReferenceMeta) => ipcRenderer.invoke(IPC.previewReference, reference),
   onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => {
     const listener = (_event: unknown, isMaximized: boolean) => callback(isMaximized)
     ipcRenderer.on(IPC.windowMaximizedChanged, listener)

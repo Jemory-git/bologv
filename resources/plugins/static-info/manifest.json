@@ -1,0 +1,7 @@
+{
+  "id": "static-info",
+  "label": "静态信息",
+  "description": "静态信息 示例",
+  "version": "0.1.0",
+  "entry": "main.js"
+}

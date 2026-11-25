@@ -7,7 +7,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { PluginObject } from '@pkg/cordis'
-import { LLM_SERVICE_NAME, type LLMService } from '@pkg/llm'
+import { LLM_SERVICE_NAME, type ChatContentPart, type LLMService } from '@pkg/llm'
 
 export const mockLLM: PluginObject = {
   name: 'mock-llm',
@@ -19,13 +19,14 @@ export const mockLLM: PluginObject = {
 
         // 上一轮是工具结果：模型「读到结果」后给出最终回答。
         if (last?.role === 'tool') {
-          return { kind: 'text', text: `工具 ${last.toolName} 返回：${last.content}` }
+          return { kind: 'text', text: `工具 ${last.toolName} 返回：${toPlainText(last.content)}` }
         }
 
         const userText =
           [...request.messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+        const prompt = toPlainText(userText)
 
-        const readMatch = /(?:读取|打开|read)\s*([^\s，。]+)/i.exec(userText)
+        const readMatch = /(?:读取|打开|read)\s*([^\s，。]+)/i.exec(prompt)
         if (readMatch !== null && hasTool('read_file')) {
           return {
             kind: 'tool_calls',
@@ -33,14 +34,24 @@ export const mockLLM: PluginObject = {
           }
         }
 
-        if (/(时间|几点|time|date)/i.test(userText) && hasTool('now')) {
+        if (/(时间|几点|time|date)/i.test(prompt) && hasTool('now')) {
           return { kind: 'tool_calls', calls: [{ id: randomUUID(), name: 'now', args: {} }] }
         }
 
-        return { kind: 'text', text: `（mock 回声）你说：${userText}` }
+        return { kind: 'text', text: `（mock 回声）你说：${prompt}` }
       },
     }
 
     ctx.provide<LLMService>(LLM_SERVICE_NAME, service)
   },
 }
+
+/** mock 只关心文本，忽略图片片段。 */
+function toPlainText(content: string | ChatContentPart[]): string {
+  if (typeof content === 'string') return content
+  return content
+    .filter((part): part is Extract<ChatContentPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n')
+}
+

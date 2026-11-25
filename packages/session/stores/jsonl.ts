@@ -14,6 +14,27 @@ import type { SessionEvent, SessionStore } from '../types.ts'
 
 const LOG_VERSION = 1
 
+/** 日志文件名；格式版本写进文件名，避免未来不兼容。 */
+export const LOG_FILE_NAME = `v${LOG_VERSION}.jsonl`
+
+/**
+ * 解析 JSONL 文本为事件数组。
+ * 崩溃时最后一行可能只写了一半，尾部残缺即丢弃。
+ */
+export function parseLog(text: string): SessionEvent[] {
+  const events: SessionEvent[] = []
+  for (const line of text.split('\n')) {
+    if (line === '') continue
+    try {
+      events.push(JSON.parse(line) as SessionEvent)
+    } catch {
+      // 无法解析的行只可能来自中断写入，跳过即可。
+      console.warn(`[session] 丢弃损坏的日志行: ${line.slice(0, 80)}`)
+    }
+  }
+  return events
+}
+
 export interface JsonlStoreOptions {
   /** 会话根目录；每个会话一个子目录。 */
   root: string
@@ -23,7 +44,7 @@ export interface JsonlStoreOptions {
 
 export function jsonlStore(options: JsonlStoreOptions): SessionStore {
   const dir = join(options.root, options.id)
-  const logPath = join(dir, `v${LOG_VERSION}.jsonl`)
+  const logPath = join(dir, LOG_FILE_NAME)
   const lockPath = join(dir, 'writer.lock')
   let locked = false
 
@@ -38,17 +59,7 @@ export function jsonlStore(options: JsonlStoreOptions): SessionStore {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
         throw error
       }
-      const events: SessionEvent[] = []
-      for (const line of text.split('\n')) {
-        if (line === '') continue
-        try {
-          events.push(JSON.parse(line) as SessionEvent)
-        } catch {
-          // 崩溃时最后一行可能只写了一半；尾部残缺即丢弃。
-          console.warn(`[session] ${logPath}: 丢弃损坏的日志行: ${line.slice(0, 80)}`)
-        }
-      }
-      return events
+      return parseLog(text)
     },
 
     async append(batch) {

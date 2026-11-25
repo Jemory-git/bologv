@@ -13,7 +13,7 @@
 import Router from '@koa/router'
 import type { Booted } from '../../boot.ts'
 import type { SessionRenameRequest, SessionSummary } from '../../shared/dto.ts'
-import type { SessionEvent } from '@pkg/session'
+import type { SessionFacts } from '@pkg/session'
 
 /** 标题长度上限（字符）。 */
 const TITLE_MAX = 100
@@ -21,16 +21,12 @@ const TITLE_MAX = 100
 export function createSessionsRouter(bootedPromise: Promise<Booted>) {
   const router = new Router()
 
-  // GET / — 列出磁盘上全部会话（scan directories），逐个生成摘要。
+  // GET / — 只读摘要：不创建会话实例、不持写者锁。
   router.get('/', async (ctx: KoaContext) => {
     const booted = await bootedPromise
     const ids = await booted.manager.list()
-    const summaries = await Promise.all(
-      ids.map(async (id) => {
-        const events = booted.manager.get(id).events()
-        return buildSummary(id, events, await booted.manager.getTitle(id))
-      }),
-    )
+    const facts = await Promise.all(ids.map((id) => booted.manager.summarize(id)))
+    const summaries = facts.map(toSummary)
     // 最近活跃优先；无事件的会话（lastActive=0）按 id（≈ 创建时间）倒序垫底。
     summaries.sort((a, b) => b.lastActive - a.lastActive || b.id.localeCompare(a.id))
     ctx.apiSuccess({ msg: 'ok', data: summaries })
@@ -43,13 +39,13 @@ export function createSessionsRouter(bootedPromise: Promise<Booted>) {
     ctx.apiSuccess({ msg: 'ok', data: { id: created.id } })
   })
 
-  // GET /:id/events — 读取指定会话的完整事件历史。
+  // GET /:id/events — 读取指定会话的完整事件历史（驻留实例优先，其次只读文件）。
   router.get('/:id/events', async (ctx: KoaContext) => {
     const booted = await bootedPromise
     const { id: rawId } = ctx.params
     const id = String(rawId ?? '')
-    const session = booted.manager.get(id)
-    ctx.apiSuccess({ msg: 'ok', data: { events: [...session.events()] } })
+    const events = await booted.manager.readEvents(id)
+    ctx.apiSuccess({ msg: 'ok', data: { events: [...events] } })
   })
 
   // PATCH /:id — 重命名：只写 meta.json，不动事件日志。
@@ -91,30 +87,17 @@ export function createSessionsRouter(bootedPromise: Promise<Booted>) {
 
 // —— helpers ——
 
-function buildSummary(id: string, events: readonly SessionEvent[], metaTitle: string | null): SessionSummary {
+function toSummary(facts: SessionFacts): SessionSummary {
+  const firstText = facts.firstUserText?.trim() ?? ''
+  const fallbackTitle = firstText === ''
+    ? `会话 ${facts.id.slice(-6)}`
+    : truncate(firstText, 40)
   return {
-    id,
-    title: metaTitle ?? fallbackTitle(id, events),
-    lastActive: events.at(-1)?.ts ?? 0,
-    preview: extractPreview(events),
+    id: facts.id,
+    title: facts.title ?? fallbackTitle,
+    lastActive: facts.lastActive,
+    preview: truncate(facts.lastPreview, 80),
   }
-}
-
-/** 未重命名时的标题：首条用户消息 > 「会话 xxxxxx」。 */
-function fallbackTitle(id: string, events: readonly SessionEvent[]): string {
-  const firstUser = events.find((ev) => ev.type === 'user/message')
-  if (firstUser === undefined) return `会话 ${id.slice(-6)}`
-  return truncate(firstUser.text, 40)
-}
-
-function extractPreview(events: readonly SessionEvent[]): string {
-  for (let i = events.length - 1; i >= 0; i -= 1) {
-    const ev = events[i]!
-    if (ev.type === 'user/message' || ev.type === 'assistant/message') {
-      return truncate(ev.text, 80)
-    }
-  }
-  return ''
 }
 
 function truncate(text: string, max: number): string {

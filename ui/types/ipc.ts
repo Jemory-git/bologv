@@ -1,26 +1,24 @@
 /**
  * 渲染进程侧的 IPC 契约：preload 通过 contextBridge 把 window.bologv 暴露给页面。
  *
- * 通道名和载荷类型必须与 electron/types/ipc.ts 保持一致——
- * BootInfo 是主进程 BootResponse 的渲染侧投影（只保留渲染进程需要的字段）。
+ * 载荷类型（BootInfo / WindowControlAction）来自 shared/ipc.ts，
+ * 与主进程、preload 共用同一份定义；这里只描述窗口对象本身的形状。
  * 业务数据（含会话历史）走 HTTP，不走 IPC。
  */
-import type { SessionEvent } from '@pkg/session'
+import type { ReferenceMeta, SessionEvent } from '@pkg/session'
+import type { BootInfo, WindowControlAction } from '../../shared/ipc.ts'
 
-/** boot 通道的返回：插件列表、会话根目录、工作目录。 */
-export interface BootInfo {
-  plugins: string[]
-  sessionsRoot: string
-  workingDir: string
-}
-
-export type WindowControlAction = 'minimize' | 'toggle-maximize' | 'close'
+export type { BootInfo, WindowControlAction } from '../../shared/ipc.ts'
 
 /** preload 暴露的 API；没有 Electron 外壳时 window.bologv 不存在。 */
 export interface BologvApi {
   boot(): Promise<BootInfo>
   windowControl(action: WindowControlAction): Promise<void>
   isWindowMaximized(): Promise<boolean>
+  /** 打开系统文件选择框，返回本地绝对路径；取消时返回空数组。 */
+  pickReferenceFiles(): Promise<string[]>
+  /** 打开独立预览窗口；同一路径已打开时聚焦已有窗口。 */
+  previewReference(reference: ReferenceMeta): Promise<void>
   onWindowMaximizedChanged(callback: (isMaximized: boolean) => void): () => void
   onEvent(callback: (event: SessionEvent) => void): () => void
   /** 开发模式下插件源码变化时触发；返回退订函数。 */

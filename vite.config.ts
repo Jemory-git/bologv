@@ -66,6 +66,13 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../dist/ui',
       emptyOutDir: true,
+      // 主应用与预览窗口是两个独立入口：预览不加载插件树，也不经过主入口的启动逻辑。
+      rollupOptions: {
+        input: {
+          main: fileURLToPath(new URL('./ui/index.html', import.meta.url)),
+          preview: fileURLToPath(new URL('./ui/preview.html', import.meta.url)),
+        },
+      },
     },
   }
 })

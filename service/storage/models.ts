@@ -3,8 +3,10 @@
  */
 
 import { join } from 'node:path'
-import type { ModelDef, Vendor } from '@pkg/llm/types.ts'
+import { isModality, isModelCategory } from '@pkg/llm/types.ts'
 import { SETTINGS_DIR, readJsonFile, writeJsonFile } from './internal.ts'
+
+import type { Modality, ModelDef, Vendor } from '@pkg/llm/types.ts'
 
 const MODELS_FILE = join(SETTINGS_DIR, 'models.json')
 
@@ -15,14 +17,28 @@ const DEFAULT_VENDORS: Vendor[] = [
     baseURL: 'https://api.deepseek.com/v1',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     models: [
-      { id: 'model-chat', modelId: 'deepseek-chat', path: '/chat/completions' },
-      { id: 'model-reasoner', modelId: 'deepseek-reasoner', path: '/chat/completions' },
+      {
+        id: 'model-chat',
+        modelId: 'deepseek-chat',
+        path: '/chat/completions',
+        category: 'language',
+        inputModalities: ['text'],
+      },
+      {
+        id: 'model-reasoner',
+        modelId: 'deepseek-reasoner',
+        path: '/chat/completions',
+        category: 'language',
+        inputModalities: ['text'],
+      },
     ],
   },
 ]
 
 export async function loadModels(): Promise<Vendor[]> {
-  return readJsonFile(MODELS_FILE, DEFAULT_VENDORS, parseVendors)
+  // 通用读取只负责 JSON 损坏恢复；配置形状错误必须暴露，不能回退成默认能力。
+  const raw = await readJsonFile<unknown>(MODELS_FILE, DEFAULT_VENDORS)
+  return parseVendors(raw)
 }
 
 export async function saveModels(vendors: Vendor[]): Promise<void> {
@@ -31,7 +47,8 @@ export async function saveModels(vendors: Vendor[]): Promise<void> {
 
 // —— 形状校验 ——
 // PUT 边界与 models.json 读取共用这份规则，与前端 ModelModal.validate 对齐：
-// 至少一个厂商、必填字段非空（去首尾空白）、path 以 / 开头、id / modelId 唯一。
+// 至少一个厂商、必填字段非空（去首尾空白）、path 以 / 开头、id / modelId 唯一；
+// 模型类别合法，输入模态非空、无未知值、无重复项。
 // 校验失败抛错，由调用方决定语义。
 
 export function parseVendors(raw: unknown): Vendor[] {
@@ -77,11 +94,34 @@ function parseModel(raw: unknown, field: string): ModelDef {
   if (!path.startsWith('/')) {
     throw new Error(`${field}.path must start with "/"`)
   }
+  const category = m.category
+  if (!isModelCategory(category)) {
+    throw new Error(`${field}.category is invalid`)
+  }
   return {
     id: asString(m.id, `${field}.id`),
     modelId: asString(m.modelId, `${field}.modelId`),
     path,
+    category,
+    inputModalities: asInputModalities(m.inputModalities, `${field}.inputModalities`),
   }
+}
+
+function asInputModalities(raw: unknown, field: string): Modality[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`${field} must be a non-empty array`)
+  }
+  const modalities: Modality[] = []
+  for (const value of raw) {
+    if (!isModality(value)) {
+      throw new Error(`${field} contains an unknown modality`)
+    }
+    if (modalities.includes(value)) {
+      throw new Error(`${field} contains duplicate modality "${value}"`)
+    }
+    modalities.push(value)
+  }
+  return modalities
 }
 
 function asRecord(raw: unknown, field: string): Record<string, unknown> {

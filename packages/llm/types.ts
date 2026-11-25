@@ -14,9 +14,19 @@ export interface ToolCall {
   args: Record<string, unknown>
 }
 
+/**
+ * 消息内容片段。
+ * 文本与图片分开表达，由 provider 翻译成各家的实际协议；
+ * 上层与事件日志都不关心 base64 还是 URL。
+ */
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mimeType: string; data: string }
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string
+  /** 纯文本用 string 表达；带参考文件时使用多段内容。 */
+  content: string | ChatContentPart[]
   /** assistant 消息携带的工具调用；tool 结果消息通过 toolCallId 与之配对。 */
   toolCalls?: ToolCall[]
   toolName?: string
@@ -50,10 +60,28 @@ export const LLM_SERVICE_NAME = 'llm'
 // —— 模型配置（settings/models.json 的共享形状）——
 // 组合根、settings 存储、HTTP DTO、UI 配置面板都消费这份定义。
 
+export const MODEL_CATEGORIES = ['language', 'image', 'audio', 'video'] as const
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number]
+
+export const MODALITIES = ['text', 'image', 'audio', 'video'] as const
+export type Modality = (typeof MODALITIES)[number]
+
+export function isModelCategory(value: unknown): value is ModelCategory {
+  return typeof value === 'string' && MODEL_CATEGORIES.includes(value as ModelCategory)
+}
+
+export function isModality(value: unknown): value is Modality {
+  return typeof value === 'string' && MODALITIES.includes(value as Modality)
+}
+
 export interface ModelDef {
   id: string
   modelId: string    // API 模型标识，如 "deepseek-chat"
   path: string       // endpoint path，如 "/chat/completions"
+  /** 主要任务类别，由用户显式指定。 */
+  category: ModelCategory
+  /** 模型允许接收的输入模态；多项即支持多模态输入。 */
+  inputModalities: Modality[]
 }
 
 export interface Vendor {

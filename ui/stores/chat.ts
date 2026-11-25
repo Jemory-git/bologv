@@ -2,7 +2,7 @@
  * 对话 UI 状态：当前会话 + 对话条目 + 发送锁。
  *
  * 纯 Pinia store，无任何 Cordis / bridge 依赖。
- * 初始化（HTTP 恢复历史 + 订阅 onEvent）由 main.ts 负责。
+ * 初始化（HTTP 恢复历史 + 订阅 onEvent）由 @ui/use/session-restore.ts 负责。
  *
  * seen 集合按 (sessionId, seq) 去重：历史恢复与实时推送可能重叠，
  * 加上可能包含不同会话的事件，双重 key 保证不乱入。
@@ -10,12 +10,9 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { getSessionEvents } from '@ui/http/sessions.ts'
 import type { ChatEntry } from '@ui/types/view-model.ts'
 import type { SessionEvent } from '@pkg/session'
-
-/** 简化版响应体：switchSession 的 fetchFn 参数类型对齐 http.get 返回值。 */
-type RespBody = { code: number; msg: string; data?: { events: SessionEvent[] }; errCode?: number; errMsg?: string }
-type FetchFn = (id: string) => Promise<[Error | null, RespBody, Response | null]>
 
 export const useChatStore = defineStore('chat', () => {
   //states
@@ -40,7 +37,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 实时事件入口（main.ts 把所有 session/event 都交给这里）。
+   * 实时事件入口（启动引导把所有 session/event 都交给这里）。
    * 当前会话 → 直接入列；切换目标会话 → 缓冲等提交；其它会话 → 丢弃。
    */
   function appendEvent(event: SessionEvent): void {
@@ -96,17 +93,16 @@ export const useChatStore = defineStore('chat', () => {
    * 拉取期间旧会话保持原样（不高亮、不清空），避免闪空；
    * 重复点击当前会话直接忽略；连续点击不同会话时最后一次生效。
    *
-   * @param id        目标会话 id
-   * @param fetchFn   http.getSessionEvents（tuple 返回），由调用方注入避免循环 import
+   * @param id  目标会话 id
    */
-  async function switchSession(id: string, fetchFn: FetchFn): Promise<void> {
+  async function switchSession(id: string): Promise<void> {
     if (id === currentSessionId.value) return
 
     const ticket = ++switchSeq
     switchTarget = id
     switchBuffer = []
 
-    const [, body] = await fetchFn(id)
+    const [, body] = await getSessionEvents(id)
     if (ticket !== switchSeq) return // 已有更新的切换/新建动作，本次结果作废
 
     if (body.code !== 0) {

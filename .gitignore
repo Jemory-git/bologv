@@ -7,3 +7,6 @@ apps/electron/dist/
 dist-web/
 release/
 dist/
+
+# TRAE IDE 生成的 HTML 分享缓存
+.trae-html-share-packages/

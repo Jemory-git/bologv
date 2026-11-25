@@ -1,6 +1,6 @@
 /**
  * Chat 输入框区域的动作按钮列表。
- * 位于 composer 左侧，放快捷输入类按钮（上传、粘贴、模板……）。
+ * 位于 composer 左侧，放快捷输入类按钮（参考文件、粘贴、模板……）。
  */
 import { ListSlot } from '../slots.ts'
 
