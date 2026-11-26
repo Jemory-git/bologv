@@ -11,7 +11,11 @@ import { basename, extname, isAbsolute, resolve } from 'node:path'
 import type { ReferenceKind, ReferenceMeta } from '@pkg/session'
 import { ValidationError } from '../errors.ts'
 
-const MAX_BYTES = 20 * 1024 * 1024
+const MAX_M = 50
+const MAX_BYTES = MAX_M * 1024 * 1024
+
+/** 单次请求的参考文件数量上限：过多无实际意义，也避免批量 stat/readFile 卡住事件循环。inspect 与 chat 共用。 */
+export const MAX_REFERENCE_PATHS = 5
 
 const KIND_LABEL = {
   doc: '文档',
@@ -96,7 +100,7 @@ export async function inspectReferencePath(input: string): Promise<ReferenceMeta
   if (info === null) throw new ValidationError(`文件不存在：${path}`)
   if (!info.isFile()) throw new ValidationError(`不是文件：${path}`)
   if (info.size === 0) throw new ValidationError(`文件为空：${path}`)
-  if (info.size > MAX_BYTES) throw new ValidationError('文件超过 20MB 上限')
+  if (info.size > MAX_BYTES) throw new ValidationError(`文件超过 ${MAX_M}MB 上限`)
 
   const name = basename(path)
   const kind = classifyReference(name)
@@ -141,7 +145,7 @@ export async function readReferenceText(reference: ReferenceMeta): Promise<strin
   return buffer.toString('utf-8')
 }
 
-/** 按路径读取图片字节；文件缺失时返回 null。 */
-export async function readReferenceData(reference: ReferenceMeta): Promise<Buffer | null> {
+/** 按路径读取文件字节；文件缺失时返回 null。 */
+export async function readReferenceBytes(reference: ReferenceMeta): Promise<Buffer | null> {
   return readFile(reference.path).catch(() => null)
 }

@@ -13,7 +13,7 @@ import IconPicture from '~icons/icon-park-outline/picture'
 import IconVideo from '~icons/icon-park-outline/video'
 
 import type { Component } from 'vue'
-import type { ReferenceKind } from '@pkg/session/types.ts'
+import type { ReferenceKind } from '@pkg/session/references.ts'
 
 const TEXT_EXTS = new Set(['.txt', '.md', '.markdown', '.log'])
 

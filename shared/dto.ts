@@ -5,7 +5,9 @@
  * 路由 handler 和 ui/http 的客户端函数签名共同消费这份。
  */
 
-import type { ReferenceMeta, SessionEvent } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
+import type { SessionEvent } from '@pkg/session/types.ts'
+import type { ToolCatalogItem, ToolSettingsEntry } from '@pkg/tools'
 import type { Vendor } from '@pkg/llm/types.ts'
 
 // —— Chat ——
@@ -16,9 +18,9 @@ export interface ChatRequest {
   /**
    * 参考文件的绝对路径，按输入框中的展示顺序排列。
    *
-   * 只传路径、不传别名：类别（按扩展名）与「第几张」都从「路径 + 数组顺序」派生，
-   * 服务端投影时会为每项生成模型可见标记，如「【参考文件 #2：图片 1「cat.png」】」，
-   * 因此用户说「图片一 / 第三张图片 / cat.png」都能对上。
+   * 只传路径、不传别名：类别（按扩展名）与「第几张」都从「路径 + 数组顺序」派生。
+   * 投影时 user 消息只带「锚点 + 路径」，文档由模型调 read_file 读取、图片经 understand_image
+   * 或（capable 模型）从快照内嵌；因此用户说「图片一 / 第三张图片 / cat.png」都能对上。
    */
   referencePaths: string[]
   /** UI 选定的模型（modelId）；后端按请求时点最新配置解析，找不到报错。 */
@@ -142,6 +144,20 @@ export interface PluginSettingsPutResponse {
 export interface HealthResponse {
   ok: true
   timestamp: number
+}
+
+// —— Tools ——
+
+export interface ToolCatalogResponse {
+  tools: ToolCatalogItem[]
+}
+
+export type ToolSettingsResponse = Record<string, ToolSettingsEntry>
+
+export type ToolSettingsPutRequest = Record<string, ToolSettingsEntry>
+
+export interface ToolSettingsPutResponse {
+  ok: true
 }
 
 // —— Error ——

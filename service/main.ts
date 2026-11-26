@@ -10,7 +10,6 @@ import Router from '@koa/router'
 import bodyParser from 'koa-bodyparser'
 
 import { apiResFnMount2Ctx } from '../shared/api-response.ts'
-import { ensureBooted } from '../boot.ts'
 import { errorMiddleware } from './middleware/error.ts'
 import { staticMiddleware } from './middleware/static.ts'
 import { registerApiRoutes } from './routes/index.ts'
@@ -18,8 +17,6 @@ import type { Server } from 'node:http'
 import type { StartServiceOptions } from './types.ts'
 
 export function startService(options: StartServiceOptions): Promise<Server> {
-  const bootedPromise = ensureBooted()
-
   const app = new Koa()
 
   // 挂载 apiSuccess / apiError / responseStream 到 ctx 原型
@@ -30,7 +27,7 @@ export function startService(options: StartServiceOptions): Promise<Server> {
   app.use(errorMiddleware())
   app.use(bodyParser({ enableTypes: ['json'] }))
 
-  registerApiRoutes(router, bootedPromise)
+  registerApiRoutes(router, options.bootedPromise)
   app.use(router.routes())
   app.use(router.allowedMethods())
 

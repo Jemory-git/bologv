@@ -1,4 +1,5 @@
-/** 工具包：工具契约、注册表与内置工具提供者。 */
+/** 工具包：Tool 定义 + ToolManager plugin + 发现清单 + 能力工厂。 */
 export * from './types.ts'
-export * from './registry.ts'
-export * from './builtin.ts'
+export * from './manager.ts'
+export * from './discover.ts'
+export * from './factory.ts'

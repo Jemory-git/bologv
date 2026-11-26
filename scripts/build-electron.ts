@@ -47,6 +47,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
+  loader: { '.md': 'text' },
   external: NODE_MODULES,
   define: PRODUCTION_DEFINE,
   tsconfig: join(project, 'tsconfig.json'),

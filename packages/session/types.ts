@@ -2,54 +2,13 @@
  * 会话能力接缝的 Service Definition，外加存储与检查点两份契约。
  *
  * 关键不变量：模型可见 ⟺ 已记录。会话只有事件日志这一份事实源，
- * 发往模型的消息由 projections/chat.ts 从日志投影而来。
+ * 发往模型的消息由 @pkg/loop 的 chat-projection 从日志投影而来；本包只负责记录事实。
  *
  * 多会话架构：SessionService 是纯工厂产物（不走 ctx.provide），
  * SessionManager 是唯一挂进 Cordis 的服务，负责按 id 产生 / 缓存 / 切换活跃会话。
  */
 
-/** 参考文件类别：决定主进程的处理路径，不用于 UI 分组。 */
-export const REFERENCE_KINDS = ['doc', 'image', 'audio', 'video'] as const
-export type ReferenceKind = (typeof REFERENCE_KINDS)[number]
-
-/** 类别短标签；UI 徽标与模型可见的引用标记共用，避免两处措辞不一致。 */
-export const REFERENCE_KIND_LABEL: Record<ReferenceKind, string> = {
-  doc: '文档',
-  image: '图片',
-  audio: '音频',
-  video: '视频',
-}
-
-/**
- * 参考文件元信息快照。
- * 本地应用直接引用原文件路径，不复制文件；事件里存快照，
- * 因此即使原文件之后变化，历史仍能说明当时引用的是哪个文件。
- */
-export interface ReferenceMeta {
-  /** 绝对路径。 */
-  path: string
-  kind: ReferenceKind
-  name: string
-  mime: string
-  size: number
-}
-
-/**
- * 每个引用的简短标识，形如「图片 2」「文档 1」。
- *
- * 语义完全由「数组顺序 + 类别」派生，客户端不上报别名：
- *   - 数组顺序就是用户在输入框里看到的顺序，因此「第三张图片」可映射到第 3 个 image；
- *   - 类别由服务端按扩展名判定，UI 与模型拿到的是同一份结论。
- * 投影时的模型可见标记与 UI 徽标都用这里，保证「用户说的」与「模型看到的」一致。
- */
-export function referenceLabels(references: readonly ReferenceMeta[]): string[] {
-  const counts = new Map<ReferenceKind, number>()
-  return references.map((reference) => {
-    const ordinal = (counts.get(reference.kind) ?? 0) + 1
-    counts.set(reference.kind, ordinal)
-    return `${REFERENCE_KIND_LABEL[reference.kind]} ${ordinal}`
-  })
-}
+import type { ReferenceMeta } from './references.ts'
 
 /**
  * 事件事实源。每条事件自带 sessionId，脱离外层包装也能归属到具体会话。
@@ -67,7 +26,7 @@ export type SessionEvent =
     }
   | { sessionId: string; seq: number; ts: number; type: 'assistant/message'; text: string }
   | { sessionId: string; seq: number; ts: number; type: 'tool/call'; callId: string; name: string; args: Record<string, unknown> }
-  | { sessionId: string; seq: number; ts: number; type: 'tool/result'; callId: string; name: string; ok: boolean; content: string }
+  | { sessionId: string; seq: number; ts: number; type: 'tool/result'; callId: string; name: string; ok: boolean; content: string; data?: Record<string, unknown> }
 
 /** append 的输入形状：sessionId / seq / ts 由会话服务分配。 */
 type EventInput<T> = T extends unknown ? Omit<T, 'sessionId' | 'seq' | 'ts'> : never

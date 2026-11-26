@@ -20,13 +20,14 @@
   import Modal from './components/modal/Modal.vue'
   import Main from './views/Main.vue'
   import ModelModal from './views/ModelModal.vue'
+  import ToolsModal from './views/ToolsModal.vue'
 
   //states
   const chat = useChatStore()
   const models = useModelsStore()
   const sessions = useSessionsStore()
 
-  type ModalKind = 'model' | null
+  type ModalKind = 'model' | 'tools' | null
   const activeModal = ref<ModalKind>(null)
 
   //hooks
@@ -57,7 +58,7 @@
       <TitleBar :model="models.selectedModelId ?? '未配置模型'" />
     </template>
     <template #sidebar>
-      <Sidebar @open-model="activeModal = 'model'" />
+      <Sidebar @open-model="activeModal = 'model'" @open-tools="activeModal = 'tools'" />
     </template>
     <Main />
     <template #statusbar>
@@ -68,5 +69,9 @@
 
   <Modal v-if="activeModal === 'model'" title="配置模型" width="92rem" height="68rem" @close="activeModal = null">
     <ModelModal @close="activeModal = null" />
+  </Modal>
+
+  <Modal v-if="activeModal === 'tools'" title="配置工具" width="92rem" height="68rem" @close="activeModal = null">
+    <ToolsModal />
   </Modal>
 </template>

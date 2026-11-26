@@ -14,9 +14,12 @@
  */
 
 import Router from '@koa/router'
+import { join } from 'node:path'
 import type { Booted } from '../../boot.ts'
 import { ConflictError, ValidationError } from '../errors.ts'
-import { assertReferencesUsable } from '../references/resolve.ts'
+import { assertReferencesUsable } from '../references/validate.ts'
+import { snapshotImageReferences } from '../references/snapshot.ts'
+import { MAX_REFERENCE_PATHS } from '../references/files.ts'
 import type { ChatRequest } from '../../shared/dto.ts'
 
 export function createChatRouter(bootedPromise: Promise<Booted>) {
@@ -28,6 +31,9 @@ export function createChatRouter(bootedPromise: Promise<Booted>) {
 
     const text = typeof body.text === 'string' ? body.text.trim() : ''
     const referencePaths = readReferencePaths(body.referencePaths)
+    if (referencePaths.length > MAX_REFERENCE_PATHS) {
+      throw new ValidationError(`一次最多添加 ${MAX_REFERENCE_PATHS} 个参考文件`)
+    }
     if (text === '' && referencePaths.length === 0) {
       throw new ValidationError('消息文本与参考文件至少需要一项')
     }
@@ -41,8 +47,10 @@ export function createChatRouter(bootedPromise: Promise<Booted>) {
       throw new ConflictError('当前会话已有任务在运行中')
     }
 
-    // 先校验参考文件存在且当前模型能处理，再占用运行态。
+    // 先校验参考文件存在且类型可处理，再占用运行态。
     const references = await assertReferencesUsable(referencePaths, model)
+    // 图片快照进会话目录（回填 snapshotPath），多模态直传从快照读，避免原文件变更漂移。
+    const referencesWithSnapshots = await snapshotImageReferences(references, join(booted.sessionsRoot, sessionId))
 
     // 切换到目标会话：加载实例并释放上一个空闲实例
     await booted.manager.switchActive(sessionId)
@@ -54,7 +62,7 @@ export function createChatRouter(bootedPromise: Promise<Booted>) {
     }
 
     try {
-      await booted.loop.run({ text, references }, model)
+      await booted.loop.run({ text, references: referencesWithSnapshots }, model)
       ctx.apiSuccess({ msg: 'ok', data: { ok: true } })
     } finally {
       await booted.manager.finishRun(sessionId)

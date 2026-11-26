@@ -10,7 +10,7 @@
  */
 
 import { BrowserWindow } from 'electron'
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 
 /** 路径 → 预览窗口；窗口关闭时移除。 */
 const previews = new Map<string, BrowserWindow>()

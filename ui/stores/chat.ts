@@ -96,6 +96,8 @@ export const useChatStore = defineStore('chat', () => {
    * @param id  目标会话 id
    */
   async function switchSession(id: string): Promise<void> {
+    console.log(id , currentSessionId.value);
+    
     if (id === currentSessionId.value) return
 
     const ticket = ++switchSeq

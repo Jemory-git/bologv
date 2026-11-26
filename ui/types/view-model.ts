@@ -11,6 +11,12 @@ export type ChatEntry =
   | { kind: 'notice'; text: string }
   | { kind: 'error'; text: string }
 
+/** 一次工具调用：call 事件 + 按 callId 配对的 result（尚未回灌时缺省）。 */
+export interface ToolCallPair {
+  call: Extract<SessionEvent, { type: 'tool/call' }>
+  result?: Extract<SessionEvent, { type: 'tool/result' }>
+}
+
 /** 侧边栏会话条目：后端给出标题，前端只补展示用时间文案。 */
 export interface SessionSummary {
   id: string

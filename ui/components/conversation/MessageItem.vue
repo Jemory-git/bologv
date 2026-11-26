@@ -4,9 +4,9 @@
  * 用户消息可携带参考文件，平铺展示名称与「类别 + 同类序号」徽标。
  */
 import { computed } from 'vue'
-import { referenceLabels } from '@pkg/session/types.ts'
+import { referenceLabels } from '@pkg/session/references.ts'
 import ReferenceCard from './reference/ReferenceCard.vue'
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 
 //states
 const props = defineProps<{

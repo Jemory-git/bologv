@@ -114,6 +114,7 @@ const mainCtx = await esbuildContext({
   platform: 'node',
   format: 'esm',
   target: 'node22',
+  loader: { '.md': 'text' },
   external: NODE_MODULES,
   tsconfig: join(project, 'tsconfig.json'),
   logLevel: 'warning',

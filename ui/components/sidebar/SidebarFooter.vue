@@ -33,11 +33,13 @@
 
   const emit = defineEmits<{
     (e: 'open-model'): void
+    (e: 'open-tools'): void
   }>()
 
   function handleItem(name: string): void {
     open.value = false
     if (name === 'model') emit('open-model')
+    else if (name === 'tools') emit('open-tools')
     // TODO: system prompt 配置
   }
 </script>
@@ -53,6 +55,9 @@
     <div v-if="open" id="settings-popover" class="popover" role="menu">
       <button type="button" class="item" role="menuitem" @click="handleItem('model')">
         配置模型
+      </button>
+      <button type="button" class="item" role="menuitem" @click="handleItem('tools')">
+        配置工具
       </button>
       <button type="button" class="item" role="menuitem" @click="handleItem('system')">
         配置 System Prompt

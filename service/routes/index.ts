@@ -14,6 +14,7 @@ import { referencesRouter } from './references.ts'
 import { settingsRouter } from './settings.ts'
 import { createChatRouter } from './chat.ts'
 import { createSessionsRouter } from './sessions.ts'
+import { createToolsRouter } from './tools.ts'
 
 export function registerApiRoutes(router: Router, bootedPromise: Promise<Booted>): void {
   router.use('/health', healthRouter.routes())
@@ -23,4 +24,5 @@ export function registerApiRoutes(router: Router, bootedPromise: Promise<Booted>
   router.use('/plugins', pluginsRouter.routes())
   router.use('/settings', settingsRouter.routes())
   router.use('/sessions', createSessionsRouter(bootedPromise).routes())
+  router.use('/tools', createToolsRouter(bootedPromise).routes())
 }

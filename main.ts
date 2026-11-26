@@ -34,10 +34,14 @@ if (!isProduction && !port) {
 
 let started: Server | undefined
 
+// 创建插件树：先于 service 启动并就绪 Promise 注入；两者仍是并行
+const bootedReady = ensureBooted()
+
 // service 监听成功即写回真实端口（生产 port 0 依赖这一步），并记下 handle 供失败时关闭
 const serviceReady = startService({
   port,
   uiRoot: isProduction ? join(__dirname, 'ui') : undefined,
+  bootedPromise: bootedReady,
 }).then((server) => {
   started = server
   const addr = server.address()
@@ -45,9 +49,6 @@ const serviceReady = startService({
   process.env.BLG_API_URL = `http://127.0.0.1:${actualPort}/`
   return server
 })
-
-// 创建插件树
-const bootedReady = ensureBooted()
 
 // 同步收敛：Promise.all 立即订阅两个 promise，消除 app-ready 前的 unhandled rejection 窗口
 void Promise.all([serviceReady, bootedReady])

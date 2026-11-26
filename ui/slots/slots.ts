@@ -131,6 +131,7 @@ export class PairSlot<EntryProps, ViewProps> extends SlotBase {
 
   /** 切换选中；传 null 回到默认视图。 */
   select(id: string | null): void {
+    if (this.activeId.value === id) return
     if (id !== null) {
       const list = this.pairs as PairEntry<EntryProps, ViewProps>[]
       if (!list.some((p) => p.id === id)) {

@@ -9,7 +9,8 @@
   },
   "include": [
     "**/*.ts",
-    "**/*.d.ts"
+    "**/*.d.ts",
+    "../shared/**/*.d.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

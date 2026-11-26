@@ -10,19 +10,16 @@
 
 import Router from '@koa/router'
 import { ValidationError } from '../errors.ts'
-import { inspectReferencePath, inspectReferencePaths, readReferenceData } from '../references/files.ts'
+import { inspectReferencePath, inspectReferencePaths, MAX_REFERENCE_PATHS, readReferenceBytes } from '../references/files.ts'
 import type { InspectReferencesRequest } from '../../shared/dto.ts'
-
-/** 一次选择过多文件没有实际意义，也避免批量 stat 卡住事件循环。 */
-const MAX_PATHS = 20
 
 export const referencesRouter = new Router()
 
 referencesRouter.post('/inspect', async (ctx: KoaContext) => {
   const body = (ctx.request.body ?? {}) as Partial<InspectReferencesRequest>
   const paths = readPaths(body.paths)
-  if (paths.length > MAX_PATHS) {
-    throw new ValidationError(`一次最多添加 ${MAX_PATHS} 个参考文件`)
+  if (paths.length > MAX_REFERENCE_PATHS) {
+    throw new ValidationError(`一次最多添加 ${MAX_REFERENCE_PATHS} 个参考文件`)
   }
 
   const result = await inspectReferencePaths(paths)
@@ -38,7 +35,7 @@ referencesRouter.post('/inspect', async (ctx: KoaContext) => {
  */
 referencesRouter.get('/content', async (ctx: KoaContext) => {
   const reference = await inspectReferencePath(readPath(ctx.query.path))
-  const data = await readReferenceData(reference)
+  const data = await readReferenceBytes(reference)
   if (data === null) throw new ValidationError(`文件不可读取：${reference.name}`)
 
   ctx.set('X-Reference-Kind', reference.kind)

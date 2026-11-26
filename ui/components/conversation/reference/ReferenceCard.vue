@@ -12,7 +12,7 @@ import { BRIDGE_SERVICE } from '@ui/plugins/core/electron-bridge.ts'
 import { useService } from '@ui/use'
 import { referenceIcon } from './reference-icon.ts'
 import type { BridgeService } from '@ui/plugins/core/electron-bridge.ts'
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 
 //states
 const props = withDefaults(

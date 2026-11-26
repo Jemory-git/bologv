@@ -19,15 +19,16 @@ const project = fileURLToPath(new URL('.', import.meta.url))
 const alias: Record<string, string> = {
   '@ui': fileURLToPath(new URL('./ui', import.meta.url)),
   '@pkg/cordis': fileURLToPath(new URL('./packages/cordis/index.ts', import.meta.url)),
-  // types.ts 别名仅供纯类型导入（运行时被擦除）；放在包别名之前，避免前缀匹配抢先
+  // 子模块别名放在包别名之前，避免前缀匹配抢先（types.ts 仅供纯类型导入，运行时被擦除）
   '@pkg/session/types.ts': fileURLToPath(new URL('./packages/session/types.ts', import.meta.url)),
+  '@pkg/session/references.ts': fileURLToPath(new URL('./packages/session/references.ts', import.meta.url)),
   '@pkg/session': fileURLToPath(new URL('./packages/session/index.ts', import.meta.url)),
   '@pkg/llm/types.ts': fileURLToPath(new URL('./packages/llm/types.ts', import.meta.url)),
   '@pkg/llm': fileURLToPath(new URL('./packages/llm/index.ts', import.meta.url)),
   '@pkg/http': fileURLToPath(new URL('./packages/http/index.ts', import.meta.url)),
   '@pkg/llm-mock': fileURLToPath(new URL('./packages/llm/llm-mock/index.ts', import.meta.url)),
   '@pkg/llm-deepseek': fileURLToPath(new URL('./packages/llm/llm-deepseek/index.ts', import.meta.url)),
-  '@pkg/runtime': fileURLToPath(new URL('./packages/runtime/index.ts', import.meta.url)),
+  '@pkg/loop': fileURLToPath(new URL('./packages/loop/index.ts', import.meta.url)),
   '@pkg/tools': fileURLToPath(new URL('./packages/tools/index.ts', import.meta.url)),
   '@pkg/agent-assistant': fileURLToPath(new URL('./packages/agents/assistant/index.ts', import.meta.url)),
 }

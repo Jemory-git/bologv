@@ -13,7 +13,7 @@ import { ensureBooted } from '../../boot.ts'
 import { openReferencePreview } from './preview.ts'
 
 import type { OpenDialogOptions } from 'electron'
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 import type { BootInfo, WindowControlAction } from '../types/ipc.ts'
 
 /** 当前版本能处理的参考文件扩展名；音频/视频待接入处理链路后再放开。 */

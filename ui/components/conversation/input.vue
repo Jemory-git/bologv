@@ -9,15 +9,16 @@
 import { computed, ref } from 'vue'
 import IconArrowUp from '~icons/icon-park-outline/arrow-up'
 import IconPaperclip from '~icons/icon-park-outline/paperclip'
-import { referenceLabels } from '@pkg/session/types.ts'
+import { referenceLabels } from '@pkg/session/references.ts'
 import ListSlotOutlet from '@ui/components/slots/ListSlotOutlet.vue'
 import { inspectReferences } from '@ui/http/references.ts'
 import { BRIDGE_SERVICE } from '@ui/plugins/core/electron-bridge.ts'
 import { chatComposerActions } from '@ui/slots'
 import { useService } from '@ui/use'
+import ModelPicker from './ModelPicker.vue'
 import ReferenceCard from './reference/ReferenceCard.vue'
 import type { BridgeService } from '@ui/plugins/core/electron-bridge.ts'
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 
 interface ComposerPayload {
   text: string
@@ -122,9 +123,12 @@ const emit = defineEmits<{ send: [payload: ComposerPayload] }>()
           <ListSlotOutlet :slot="chatComposerActions" reverse />
         </div>
 
-        <button type="button" class="send" :disabled="!canSend" title="发送" aria-label="发送" @click="onSubmit">
-          <IconArrowUp class="send-icon" aria-hidden="true" />
-        </button>
+        <div class="composer-actions">
+          <ModelPicker />
+          <button type="button" class="send" :disabled="!canSend" title="发送" aria-label="发送" @click="onSubmit">
+            <IconArrowUp class="send-icon" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -213,6 +217,13 @@ const emit = defineEmits<{ send: [payload: ComposerPayload] }>()
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
 }
 
 .tool {

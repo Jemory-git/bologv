@@ -5,6 +5,7 @@
  * - 列表数据与增删改动作来自 sessions store，组件不直接发请求
  * - 搜索框仅在前端按标题过滤，不改后端查询
  * - 插件面板在位时（sidebarPanels.activeId !== null），会话列表整体不高亮
+ * - 点会话 / 新建对话都表示"回到会话页"：先把 activeId 退回 null，再切换会话
  * - 「…」按钮（hover 时显示）打开操作菜单；再次点击同一按钮收起
  * - 删除在菜单内二次确认；删除当前会话后由 store 负责回退
  */
@@ -34,6 +35,17 @@ const filtered = computed(() => {
 function isActive(sessionId: string): boolean {
   if (panelActive.value) return false
   return sessionId === chat.currentSessionId
+}
+
+/** 选中会话即"回到会话页"：主区域若停在插件面板，先退回默认视图。 */
+function onSelect(id: string): void {
+  sidebarPanels.select(null)
+  void sessions.select(id)
+}
+
+function onCreate(): void {
+  sidebarPanels.select(null)
+  sessions.startNew()
 }
 
 function onclickMore(id: string, x: number, y: number): void {
@@ -72,14 +84,14 @@ async function removeFromMenu(): Promise<void> {
         <span class="count">{{ filtered.length }}</span>
       </div>
       <input v-model="query" class="search" type="search" placeholder="搜索会话" aria-label="搜索会话" />
-      <button class="new-chat" type="button" @click="sessions.startNew()">
+      <button class="new-chat" type="button" @click="onCreate">
         ＋ 新建对话
       </button>
     </div>
     <p v-if="sessions.error !== null" class="error">{{ sessions.error }}</p>
     <SessionItem v-for="session in filtered" :key="session.id" :session="session" :active="isActive(session.id)"
       :editing="editingId === session.id" :menu-open="menu !== null && menu.id === session.id"
-      @select="sessions.select($event)" @click-more="onclickMore" @rename="onRename"
+      @select="onSelect" @click-more="onclickMore" @rename="onRename"
       @cancel-rename="editingId = null" />
     <p v-if="filtered.length === 0" class="empty">
       {{ sessions.loading ? '加载中…' : query.trim() === '' ? '还没有会话' : '没有匹配的会话' }}

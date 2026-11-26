@@ -11,12 +11,13 @@
       "@pkg/cordis": ["./packages/cordis/index.ts"],
       "@pkg/llm": ["./packages/llm/index.ts"],
       "@pkg/llm/types.ts": ["./packages/llm/types.ts"],
-      "@pkg/runtime": ["./packages/runtime/index.ts"],
+      "@pkg/loop": ["./packages/loop/index.ts"],
       "@pkg/http": ["./packages/http/index.ts"],
       "@pkg/llm-mock": ["./packages/llm/llm-mock/index.ts"],
       "@pkg/llm-deepseek": ["./packages/llm/llm-deepseek/index.ts"],
       "@pkg/session": ["./packages/session/index.ts"],
       "@pkg/session/types.ts": ["./packages/session/types.ts"],
+      "@pkg/session/references.ts": ["./packages/session/references.ts"],
       "@pkg/tools": ["./packages/tools/index.ts"],
       "@pkg/agent-assistant": ["./packages/agents/assistant/index.ts"]
     }

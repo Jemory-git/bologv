@@ -10,7 +10,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../types/ipc.ts'
 
-import type { ReferenceMeta } from '@pkg/session/types.ts'
+import type { ReferenceMeta } from '@pkg/session/references.ts'
 import type { WindowControlAction } from '../types/ipc.ts'
 
 contextBridge.exposeInMainWorld('bologv', {

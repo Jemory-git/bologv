@@ -17,6 +17,19 @@ export interface PairEntry<EntryProps = unknown, ViewProps = unknown> {
   readonly view: SlotEntry<ViewProps>
 }
 
+/**
+ * Pair 入口组件的控制面，由 PairSlotOutlet 注入（不属于注册方声明的 props）。
+ *
+ *   active —— 当前是否选中；
+ *   select —— 点击入口时调用，选中自己（已选中时重复点击无副作用）。
+ *
+ * 入口组件的 props 必须包含这两个字段，选中态维护完全留在槽位内部。
+ */
+export interface PairEntryControl {
+  active: boolean
+  select: () => void
+}
+
 /** 插槽形态，决定条目是并列、成对还是单例。 */
 export type SlotKind = 'list' | 'pair' | 'exclusive'
 

@@ -8,10 +8,12 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { createRoot, type Context } from '@pkg/cordis'
 import { SESSION_MANAGER_SERVICE_NAME, type SessionManager } from '@pkg/session'
-import { AGENT_LOOP_SERVICE_NAME, type AgentLoopService } from '@pkg/runtime'
+import { AGENT_LOOP_SERVICE_NAME, type AgentLoopService } from '@pkg/loop'
 import { pluginManifest } from '@pkg/agent-assistant'
-import { loadModels } from './service/storage/index.ts'
-import { resolveReferenceParts } from './service/references/resolve.ts'
+import { loadModels, loadToolSettings } from './service/storage/index.ts'
+import { resolveImageEmbeds } from './service/references/image-embed.ts'
+import { inspectReferencePath, readReferenceBytes, readReferenceText } from './service/references/files.ts'
+import type { ReferenceReaderApi } from '@pkg/tools'
 
 export interface Booted {
   root: Context
@@ -37,9 +39,23 @@ async function doBoot(): Promise<Booted> {
   const workingDir = process.cwd()
   const sessionsRoot = join(app.getPath('userData'), 'sessions')
 
+  // 并发读取持久化配置（boot 时读一次；models 例外——provider 按请求时点读取）
+  const toolSettings = await loadToolSettings()
+
+  // 参考文件读取能力：复用 references 规则读任意绝对路径，注入给 read_file/understand_image 工具。
+  const referenceReader: ReferenceReaderApi = {
+    inspect: (path) => inspectReferencePath(path),
+    readText: async (path) => readReferenceText(await inspectReferencePath(path)),
+    readImage: async (path) => {
+      const reference = await inspectReferencePath(path)
+      const data = await readReferenceBytes(reference)
+      return data === null ? null : { mime: reference.mime, data: data.toString('base64') }
+    },
+  }
+
   // 并发启动：每个插件自行 wait(inject)，顺序与加载结果无关。
   await Promise.all(
-    pluginManifest(sessionsRoot, loadModels, workingDir, resolveReferenceParts).map((entry) =>
+    pluginManifest(sessionsRoot, loadModels, workingDir, resolveImageEmbeds, toolSettings, referenceReader).map((entry) =>
       root.use(entry.plugin, entry.config),
     ),
   )

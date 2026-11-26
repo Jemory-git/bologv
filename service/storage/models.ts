@@ -3,6 +3,7 @@
  */
 
 import { join } from 'node:path'
+import { ModelNotFoundError } from '@pkg/llm'
 import { isModality, isModelCategory } from '@pkg/llm/types.ts'
 import { SETTINGS_DIR, readJsonFile, writeJsonFile } from './internal.ts'
 
@@ -43,6 +44,16 @@ export async function loadModels(): Promise<Vendor[]> {
 
 export async function saveModels(vendors: Vendor[]): Promise<void> {
   await writeJsonFile(MODELS_FILE, vendors)
+}
+
+/** 按 modelId 跨厂商查找模型定义；找不到抛 ModelNotFoundError。 */
+export async function findModelDef(modelId: string): Promise<ModelDef> {
+  const vendors = await loadModels()
+  for (const vendor of vendors) {
+    const def = vendor.models.find((item) => item.modelId === modelId)
+    if (def !== undefined) return def
+  }
+  throw new ModelNotFoundError(`找不到模型 ${modelId}，请在设置里添加`)
 }
 
 // —— 形状校验 ——

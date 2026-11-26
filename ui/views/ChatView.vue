@@ -30,7 +30,7 @@
 
     const model = models.selectedModelId
     if (model === null) {
-      chat.appendError('没有可用的模型，请先在「配置模型」中添加')
+      chat.appendError('没有可用的语言模型，请先在「配置模型」中添加')
       return
     }
 

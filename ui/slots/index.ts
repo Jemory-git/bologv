@@ -11,6 +11,7 @@
 // 类型 + 基类
 export type {
   PairEntry,
+  PairEntryControl,
   SlotAccess,
   SlotDescriptor,
   SlotEntry,
