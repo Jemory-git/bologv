@@ -8,7 +8,7 @@ import Router from '@koa/router'
 import { loadModels, parseVendors, saveModels } from '../storage/index.ts'
 import { ValidationError } from '../errors.ts'
 import type { ModelsPutRequest } from '../../shared/dto.ts'
-import type { Vendor } from '@pkg/llm/types.ts'
+import type { Vendor } from '@pkg/models/types.ts'
 
 export const modelsRouter = new Router()
 

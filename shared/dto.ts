@@ -8,7 +8,7 @@
 import type { ReferenceMeta } from '@pkg/session/references.ts'
 import type { SessionEvent } from '@pkg/session/types.ts'
 import type { ToolCatalogItem, ToolSettingsEntry } from '@pkg/tools'
-import type { Vendor } from '@pkg/llm/types.ts'
+import type { Vendor } from '@pkg/models/types.ts'
 
 // —— Chat ——
 
@@ -137,6 +137,23 @@ export interface PluginSettingsPutRequest {
 
 export interface PluginSettingsPutResponse {
   ok: true
+}
+
+// —— Workspace ——
+
+export interface WorkspaceSettingsResponse {
+  /** 当前生效的工作目录（配置值不可用时为默认目录）。 */
+  workingDir: string
+}
+
+export interface WorkspaceSettingsPutRequest {
+  workingDir: string
+}
+
+export interface WorkspaceSettingsPutResponse {
+  ok: true
+  /** 已保存的规范化绝对路径。 */
+  workingDir: string
 }
 
 // —— Health ——

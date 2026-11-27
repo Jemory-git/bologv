@@ -7,10 +7,11 @@
  */
 
 import { join } from 'node:path'
-import { SETTINGS_DIR, readJsonFile, writeJsonFile } from './internal.ts'
+import { APP_PATHS } from '../paths.ts'
+import { readJsonFile, writeJsonFile } from './json-file.ts'
 import type { ToolSettings, ToolSettingsEntry } from '@pkg/tools'
 
-const TOOLS_FILE = join(SETTINGS_DIR, 'tools.json')
+const TOOLS_FILE = join(APP_PATHS.settingsDir, 'tools.json')
 
 const DEFAULT: ToolSettings = {}
 

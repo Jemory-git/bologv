@@ -12,7 +12,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { getVendors } from '@ui/http'
-import type { ModelDef, Vendor } from '@pkg/llm/types.ts'
+import type { ModelDef, Vendor } from '@pkg/models/types.ts'
 
 /** 对话候选：模型本身 + 所属厂商（选择器按厂商分组展示）。 */
 export interface ChatModelOption {

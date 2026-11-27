@@ -1,13 +1,13 @@
 /**
- * 一个 Provider 实现：规则驱动的假模型。
- * 对应真实仓库 packages/llm/llm-deepseek（那里换成 HTTP 流式请求）。
+ * 规则驱动的假模型：不依赖任何厂商配置，用于无 key 环境演示完整循环。
  *
- * 它演示的重点是：provider 只依赖 Service Definition，不认识 agent-loop。
+ * 它演示的重点是：实现只依赖 Service Definition，不认识 agent-loop。
  */
 
 import { randomUUID } from 'node:crypto'
 import type { PluginObject } from '@pkg/cordis'
-import { LLM_SERVICE_NAME, type ChatContentPart, type LLMService } from '@pkg/llm'
+import { LLM_SERVICE_NAME } from './types.ts'
+import type { ChatContentPart, LLMService } from './types.ts'
 
 export const mockLLM: PluginObject = {
   name: 'mock-llm',
@@ -54,4 +54,3 @@ function toPlainText(content: string | ChatContentPart[]): string {
     .map((part) => part.text)
     .join('\n')
 }
-

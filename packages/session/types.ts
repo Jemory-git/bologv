@@ -8,6 +8,7 @@
  * SessionManager 是唯一挂进 Cordis 的服务，负责按 id 产生 / 缓存 / 切换活跃会话。
  */
 
+import type { ProviderState } from '@pkg/models/language/types.ts'
 import type { ReferenceMeta } from './references.ts'
 
 /**
@@ -24,7 +25,15 @@ export type SessionEvent =
       /** 本轮随消息提交的参考文件；没有引用时省略。 */
       references?: ReferenceMeta[]
     }
-  | { sessionId: string; seq: number; ts: number; type: 'assistant/message'; text: string }
+  | {
+      sessionId: string
+      seq: number
+      ts: number
+      type: 'assistant/message'
+      text: string
+      /** 推理信封：原样持久化，投影原样回传；工具轮可为空文本仅携带信封。 */
+      providerState?: ProviderState
+    }
   | { sessionId: string; seq: number; ts: number; type: 'tool/call'; callId: string; name: string; args: Record<string, unknown> }
   | { sessionId: string; seq: number; ts: number; type: 'tool/result'; callId: string; name: string; ok: boolean; content: string; data?: Record<string, unknown> }
 

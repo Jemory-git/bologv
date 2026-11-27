@@ -51,7 +51,8 @@ function groupRows(entries: readonly ChatEntry[]): Row[] {
         break
       case 'assistant/message':
         run = null
-        rows.push({ kind: 'message', role: 'assistant', text: event.text })
+        // 空文本 assistant 事件仅携带推理信封，不渲染空气泡；run=null 保留工具轮分组边界。
+        if (event.text !== '') rows.push({ kind: 'message', role: 'assistant', text: event.text })
         break
       case 'tool/call':
         beginRun().push({ call: event })

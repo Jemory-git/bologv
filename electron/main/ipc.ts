@@ -83,6 +83,19 @@ export function registerIpc(options: IpcOptions): void {
     return result.canceled ? [] : result.filePaths
   })
 
+  // 目录选择：工作目录配置等场景只需要一个绝对路径，取消时返回 null。
+  ipcMain.handle(IPC.pickDirectory, async (event, title?: string): Promise<string | null> => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options: OpenDialogOptions = {
+      title: typeof title === 'string' && title !== '' ? title : '选择目录',
+      properties: ['openDirectory'],
+    }
+    const result = win === null
+      ? await dialog.showOpenDialog(options)
+      : await dialog.showOpenDialog(win, options)
+    return result.canceled ? null : result.filePaths[0] ?? null
+  })
+
   // 参考文件预览：内容由同源 HTTP 提供，主进程只负责窗口与去重。
   ipcMain.handle(IPC.previewReference, (event, reference: ReferenceMeta): void => {
     const parent = BrowserWindow.fromWebContents(event.sender)

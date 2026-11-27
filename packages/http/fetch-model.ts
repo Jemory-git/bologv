@@ -1,6 +1,7 @@
 /**
- * 针对「模型 chat completion」端点的便捷调用。
- * 把 ModelConfig 展开成 URL + Authorization header + body，底层走 fetchJson。
+ * 针对模型端点的便捷调用：协议无关的传输层。
+ * 把 ModelConfig 展开成 URL，POST 调用方给定的 body 与 headers，底层走 fetchJson。
+ * 不注入 Authorization、不注入 model——认证与 body 形状由协议适配器负责。
  */
 
 import { fetchJson, type FetchOptions } from './fetch.ts'
@@ -10,15 +11,14 @@ import type { ModelConfig } from './types.ts'
 const DEFAULT_MODEL_TIMEOUT_MS = 120_000
 
 export interface FetchModelOptions extends Omit<FetchOptions, 'body' | 'headers' | 'method'> {
-  /** 已序列化的 JSON 请求体（不含 model 字段，由 config.model 自动注入）。 */
+  /** 已序列化的 JSON 请求体，形状由协议适配器决定。 */
   body: Record<string, unknown>
-  /** 额外 headers；会与内部默认 headers 合并。 */
-  headers?: Record<string, string>
+  /** 完整请求 headers（含认证），由协议适配器提供。 */
+  headers: Record<string, string>
 }
 
 /**
- * 组装 URL + Authorization，POST 到模型端点，返回解析后的 JSON。
- * body 里的 `model` 字段会被 `config.model` 覆盖（保证与 URL/config 一致）。
+ * 组装 URL，POST 到模型端点，返回解析后的 JSON。
  * 默认超时 120s，可经 options.timeoutMs 覆盖。
  */
 export async function fetchModel<T = unknown>(
@@ -27,15 +27,10 @@ export async function fetchModel<T = unknown>(
 ): Promise<T> {
   const url = `${config.baseURL.replace(/\/+$/, '')}${config.path}`
 
-  const bodyWithModel = { ...options.body, model: config.model }
-
   return fetchJson<T>(url, {
     method: 'POST',
-    body: JSON.stringify(bodyWithModel),
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      ...options.headers,
-    },
+    body: JSON.stringify(options.body),
+    headers: options.headers,
     timeoutMs: options.timeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS,
   })
 }

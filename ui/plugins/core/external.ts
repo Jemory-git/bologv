@@ -30,7 +30,7 @@ const PANEL_PREFIX = 'external'
 
 /** 同源资源地址；id 与文件名仍由服务端二次校验。 */
 export function externalAssetUrl(id: string, file: string): string {
-  return `/api/plugins/assets/${encodeURIComponent(id)}/${encodeURIComponent(file)}`
+  return `/api/external-plugins/assets/${encodeURIComponent(id)}/${encodeURIComponent(file)}`
 }
 
 /** 动态 import 插件入口，校验 ABI 后包装成 Cordis Plugin。 */

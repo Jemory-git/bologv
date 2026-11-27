@@ -17,6 +17,8 @@ export interface BologvApi {
   isWindowMaximized(): Promise<boolean>
   /** 打开系统文件选择框，返回本地绝对路径；取消时返回空数组。 */
   pickReferenceFiles(): Promise<string[]>
+  /** 打开系统目录选择框，返回本地绝对路径；取消时返回 null。 */
+  pickDirectory(title?: string): Promise<string | null>
   /** 打开独立预览窗口；同一路径已打开时聚焦已有窗口。 */
   previewReference(reference: ReferenceMeta): Promise<void>
   onWindowMaximizedChanged(callback: (isMaximized: boolean) => void): () => void

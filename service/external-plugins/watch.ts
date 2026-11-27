@@ -1,19 +1,20 @@
 /**
- * 开发模式：监听插件源码目录，变化后通知 UI 重载。
+ * 开发模式：监听插件源目录，变化时通知调用方。
  *
- * 开发模式下外置插件直接从 resources/plugins 读取（见 service/plugins/catalog.ts），
- * 因此这里不需要复制文件，只需把「文件已变化」这一信号推给渲染进程即可。
+ * 监听的是与 catalog.ts 同一个外置插件源目录（开发态即 resources/plugins），
+ * 因此归在 plugins 域而非 Electron 侧：这里只用 node:fs，不碰任何 Electron API；
+ * 「变化后广播给渲染进程」属于组合根（electron/run.ts）的适配职责。
  */
 
 import { watch } from 'node:fs'
-import { join } from 'node:path'
-import { app } from 'electron'
+import { APP_PATHS } from '../paths.ts'
 
 /** 编辑器保存会连发多次事件（临时文件 + rename），合并成一次。 */
 const DEBOUNCE_MS = 250
 
+/** 监听插件源目录；返回停止监听的函数。目录不存在或不支持递归时静默降级为空操作。 */
 export function watchPluginSources(onChange: () => void): () => void {
-  const dir = join(app.getAppPath(), 'resources', 'plugins')
+  const dir = APP_PATHS.bundledPluginsDir
   let timer: NodeJS.Timeout | undefined
   let watcher: ReturnType<typeof watch>
   try {

@@ -22,7 +22,8 @@ import {
   type SessionEvent,
   type SessionManager,
 } from '@pkg/session'
-import { LLM_SERVICE_NAME, type ChatMessage, type LLMResult, type LLMService } from '@pkg/llm'
+import { LLM_SERVICE_NAME } from '@pkg/models/language/types.ts'
+import type { ChatMessage, LLMResult, LLMService } from '@pkg/models/language/types.ts'
 import { DISCOVERED_TOOLS_DATA_KEY, QUERY_CAPABILITIES_TOOL_NAME, TOOLS_SERVICE_NAME, type Tool, type ToolRegistry } from '@pkg/tools'
 import { toChatMessages, type ImageEmbedParts } from './chat-projection.ts'
 
@@ -44,8 +45,12 @@ export type ImageEmbedResolver = (
 /**
  * System prompt 构建器：由组合根注入，返回 static / dynamic 两部分；未注入则不产生 system 消息。
  * 两部分分开返回，为未来调整 dynamic 的摆放位置（如移到历史之后）留接缝。
+ * 入参同时给「本轮已下发的工具」与「全部已启用工具」，供 prompt 按可调用边界分组渲染。
  */
-export type SystemPromptBuilder = (input: { tools: readonly Tool[] }) => {
+export type SystemPromptBuilder = (input: {
+  callable: readonly Tool[]
+  catalog: readonly Tool[]
+}) => {
   static: string
   dynamic: string
 }
@@ -103,7 +108,7 @@ export const agentLoopPlugin: PluginObject = {
 
           // A 方案：static + dynamic 并入一条 system 消息，置于历史之前。
           const history = toChatMessages(events, imageEmbeds)
-          const prompt = buildSystemPrompt?.({ tools: allTools })
+          const prompt = buildSystemPrompt?.({ callable: sendList, catalog: allTools })
           const messages: ChatMessage[] = prompt === undefined
             ? history
             : [{ role: 'system', content: `${prompt.static}\n\n${prompt.dynamic}` }, ...history]
@@ -119,9 +124,18 @@ export const agentLoopPlugin: PluginObject = {
           })
 
           if (result.kind === 'text') {
-            session.append({ type: 'assistant/message', text: result.text })
+            session.append({
+              type: 'assistant/message',
+              text: result.text,
+              ...(result.providerState !== undefined ? { providerState: result.providerState } : {}),
+            })
             await checkpoint?.at('turn-end')
             return result.text
+          }
+
+          // 推理信封先落一条空文本 assistant 事件（投影据此把信封与 tool_calls 合并回同一条消息）。
+          if (result.providerState !== undefined) {
+            session.append({ type: 'assistant/message', text: '', providerState: result.providerState })
           }
 
           // 先记录本轮所有调用（投影合并为一条 assistant.tool_calls），再逐个执行回灌结果。

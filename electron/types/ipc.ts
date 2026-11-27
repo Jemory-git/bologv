@@ -21,6 +21,7 @@ export const IPC = {
   windowIsMaximized: 'blg:window-is-maximized',
   windowMaximizedChanged: 'blg:window-maximized-changed',
   pickReferences: 'blg:pick-references',
+  pickDirectory: 'blg:pick-directory',
   previewReference: 'blg:preview-reference',
 } as const
 

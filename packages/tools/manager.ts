@@ -17,11 +17,14 @@
  */
 
 import type { PluginObject } from '@pkg/cordis'
-import { LLM_SERVICE_NAME, type LLMService, type Vendor } from '@pkg/llm/types.ts'
+import { LLM_SERVICE_NAME } from '@pkg/models/language/types.ts'
+import type { LLMService } from '@pkg/models/language/types.ts'
+import type { Vendor } from '@pkg/models/types.ts'
 import { discoverTools } from './discover.ts'
 import { buildFsApi, buildShellApi } from './factory.ts'
 import type {
   ReferenceReaderApi,
+  SystemInfo,
   Tool,
   ToolCatalog,
   ToolCatalogItem,
@@ -42,6 +45,10 @@ interface ManagerConfig {
   settings?: ToolSettings
   getModels?: () => Promise<Vendor[]>
   referenceReader?: ReferenceReaderApi
+  /** 覆盖写保护实现，由组合根注入（读会话事件判断是否已读过某文件）。 */
+  hasReadFile?: (absolutePath: string) => Promise<boolean>
+  /** 应用自身信息快照，供 get_system_info 使用。 */
+  systemInfo?: SystemInfo
 }
 
 export const toolManagerPlugin: PluginObject = {
@@ -80,18 +87,22 @@ export const toolManagerPlugin: PluginObject = {
     const runCtx: ToolRunContext = {
       llm,
       fs: config.rootDir ? buildFsApi(config.rootDir) : undefined,
-      shell: config.enableShell ? buildShellApi() : undefined,
+      shell: config.enableShell === true && config.rootDir !== undefined ? buildShellApi(config.rootDir) : undefined,
       tools: registry,
-      pickModel: async (category) => {
+      pickModel: async (requirement) => {
         const vendors = (await config.getModels?.()) ?? []
         for (const v of vendors) {
           for (const m of v.models) {
-            if (m.category === category) return m.modelId
+            if (m.category === requirement.category && m.inputModalities.includes(requirement.inputModality)) {
+              return m.modelId
+            }
           }
         }
         return undefined
       },
       referenceReader: config.referenceReader,
+      hasReadFile: config.hasReadFile,
+      systemInfo: config.systemInfo,
     }
 
     // 发现 + 实例化。每个工厂拿到同一份 ctx，能力构造时绑定。
@@ -99,19 +110,15 @@ export const toolManagerPlugin: PluginObject = {
       discovered.push(factory(runCtx))
     }
 
-    const toCatalogItem = (t: Tool): ToolCatalogItem => {
-      const item: ToolCatalogItem = {
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters,
-        enabled: effectiveEnabled(t),
-        favorite: effectiveFavorite(t),
-        disableable: t.disableable !== false,
-        favoriteEditable: t.favoriteEditable !== false,
-      }
-      if (t.preferredModelCategory) item.preferredModelCategory = t.preferredModelCategory
-      return item
-    }
+    const toCatalogItem = (t: Tool): ToolCatalogItem => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+      enabled: effectiveEnabled(t),
+      favorite: effectiveFavorite(t),
+      disableable: t.disableable !== false,
+      favoriteEditable: t.favoriteEditable !== false,
+    })
 
     ctx.provide<ToolRegistry>(TOOLS_SERVICE_NAME, registry)
 

@@ -13,6 +13,7 @@
   const emit = defineEmits<{
     (e: 'open-model'): void
     (e: 'open-tools'): void
+    (e: 'open-workspace'): void
   }>()
 </script>
 
@@ -21,7 +22,7 @@
     <SidebarHeader />
     <PanelList />
     <SessionList />
-    <SidebarFooter @open-model="emit('open-model')" @open-tools="emit('open-tools')" />
+    <SidebarFooter @open-model="emit('open-model')" @open-tools="emit('open-tools')" @open-workspace="emit('open-workspace')" />
   </div>
 </template>
 

@@ -13,7 +13,7 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { createWindow, broadcast } from './main/window.ts'
 import { registerIpc } from './main/ipc.ts'
-import { watchPluginSources } from './main/plugins-watch.ts'
+import { watchPluginSources } from '../service/external-plugins/watch.ts'
 import { teardown, type Booted } from '../boot.ts'
 import { IPC } from './types/ipc.ts'
 import type { Server } from 'node:http'

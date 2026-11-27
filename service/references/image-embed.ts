@@ -6,7 +6,7 @@
  * 投影解析不抛错，缺失降级。
  */
 
-import type { ChatContentPart } from '@pkg/llm'
+import type { ChatContentPart } from '@pkg/models/language/types.ts'
 import type { ReferenceMeta } from '@pkg/session'
 import type { ImageEmbedParts } from '@pkg/loop'
 import { findModelDef } from '../storage/index.ts'

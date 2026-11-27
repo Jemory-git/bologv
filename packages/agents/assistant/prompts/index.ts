@@ -15,12 +15,24 @@ import environment from './environment.md'
 import toolCatalog from './tool-catalog.md'
 
 import type { Tool } from '@pkg/tools'
+import { QUERY_CAPABILITIES_TOOL_NAME } from '@pkg/tools'
 
 // —— 类型 ——
 
-/** 构建输入：当前启用的工具列表（工具目录的唯一事实源）。 */
+/**
+ * 构建输入：工具分两份视图。
+ *
+ * - callable：本轮 tools 参数中已下发、模型可直接调用；
+ * - catalog：已启用的全部工具，用于让模型知道能力范围。
+ *
+ * 分开传入而不是传一份再附加集合，是因为工具目录要按这两组分别渲染——
+ * 模型看到「目录里有但调不了」正是乱调未激活工具的根因。
+ */
 export interface SystemPromptInput {
-  tools: readonly Tool[]
+  callable: readonly Tool[]
+  catalog: readonly Tool[]
+  /** 工作目录：文件类工具的相对路径基准，模型必须知道它在哪。 */
+  workingDir: string
 }
 
 /** 构建产物：静态段与动态段分开返回，由消费方决定如何摆放。 */
@@ -35,7 +47,8 @@ export function buildSystemPrompt(input: SystemPromptInput): SystemPromptParts {
   const values: Record<string, string> = {
     platform: process.platform,
     today: new Date().toISOString().slice(0, 10),
-    toolCatalog: renderToolCatalog(input.tools),
+    workingDir: input.workingDir,
+    toolCatalog: renderToolCatalog(input),
   }
   const render = (sections: readonly string[]): string =>
     sections.map((section) => interpolate(section, values)).join('\n\n')
@@ -57,7 +70,24 @@ function interpolate(template: string, values: Record<string, string>): string {
   })
 }
 
-/** 工具目录：纯列表（名称 + 描述），不带标题、不带 schema、不标记 favorite。 */
-function renderToolCatalog(tools: readonly Tool[]): string {
+/**
+ * 工具目录：按「本轮可直接调用」「需先激活」分组渲染，每组只列名称 + 描述。
+ *
+ * 分组就是模型要遵守的可调用边界，让它不必再靠记忆去对齐 tools 参数；
+ * 第二组为空时不输出空标题。
+ */
+function renderToolCatalog(input: SystemPromptInput): string {
+  const callableNames = new Set(input.callable.map((tool) => tool.name))
+  const ready = input.catalog.filter((tool) => callableNames.has(tool.name))
+  const pending = input.catalog.filter((tool) => !callableNames.has(tool.name))
+
+  const sections = [`本轮可直接调用：\n${renderToolLines(ready)}`]
+  if (pending.length > 0) {
+    sections.push(`需先调用 ${QUERY_CAPABILITIES_TOOL_NAME} 激活后才能调用：\n${renderToolLines(pending)}`)
+  }
+  return sections.join('\n\n')
+}
+
+function renderToolLines(tools: readonly Tool[]): string {
   return tools.map((tool) => `- ${tool.name}：${tool.description}`).join('\n')
 }

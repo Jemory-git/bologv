@@ -29,6 +29,8 @@ export interface BridgeService {
   onWindowMaximizedChanged(listener: (isMaximized: boolean) => void): () => void
   /** 打开系统文件框选择参考文件；返回本地绝对路径，取消时为空数组。 */
   pickReferences(): Promise<string[]>
+  /** 打开系统目录框选择目录；返回本地绝对路径，取消时为 null。 */
+  pickDirectory(title?: string): Promise<string | null>
   /** 打开独立预览窗口；同一路径已打开时聚焦已有窗口。 */
   previewReference(reference: ReferenceMeta): Promise<void>
   /** 订阅会话事件；返回退订函数。 */
@@ -62,6 +64,7 @@ export const electronBridge: Plugin = {
       isWindowMaximized: () => api.isWindowMaximized(),
       onWindowMaximizedChanged: (listener) => api.onWindowMaximizedChanged(listener),
       pickReferences: () => api.pickReferenceFiles(),
+      pickDirectory: (title) => api.pickDirectory(title),
       previewReference: (reference) => api.previewReference(reference),
       onEvent: (listener) => api.onEvent(listener),
       onPluginsChanged: (listener) => api.onPluginsChanged(listener),

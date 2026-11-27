@@ -5,8 +5,8 @@
  * 新增一个 tool = 在 impl/ 下加文件导出 Tool 对象 + discover.ts 清单加一行。
  */
 
-import type { LLMService } from '@pkg/llm/types.ts'
-import type { ModelCategory } from '@pkg/llm/types.ts'
+import type { LLMService } from '@pkg/models/language/types.ts'
+import type { ModelCategory, Modality } from '@pkg/models/types.ts'
 import type { ReferenceMeta } from '@pkg/session/references.ts'
 
 // —— 运行时能力接口 ——
@@ -15,7 +15,7 @@ import type { ReferenceMeta } from '@pkg/session/references.ts'
 export interface ToolFsApi {
   /** 沙箱根目录绝对路径。readText/writeText 等接受相对路径。 */
   rootDir: string
-  /** 读取文本文件内容；超出上限会截断。 */
+  /** 读取完整文本内容；超过大小上限抛错。字符截断由工具按自身展示预算处理，能力层不截断。 */
   readText(relPath: string): Promise<string>
   /** 读取文件为 base64（附带 MIME），用于图片类 tool 喂给多模态模型。 */
   readAsBase64(relPath: string): Promise<{ mime: string; data: string }>
@@ -27,7 +27,7 @@ export interface ToolFsApi {
   stat(relPath: string): Promise<{ size: number; isDir: boolean; modified: number }>
 }
 
-/** Shell 执行结果。 */
+/** Shell 执行结果：只表达「命令跑起来了，结果如何」。进程未启动请抛错，不在此伪装成失败退出。 */
 export interface ShellResult {
   stdout: string
   stderr: string
@@ -36,7 +36,30 @@ export interface ShellResult {
 
 /** Shell 工具能力（超时限制 + 输出截断）。 */
 export interface ToolShellApi {
+  /** 以 shell 解释整条命令（支持管道、重定向、&&）；超时终止复用退出码语义。 */
   exec(command: string, options?: { timeoutMs?: number }): Promise<ShellResult>
+}
+
+// —— 应用自身信息 ——
+
+/**
+ * 应用自身的只读信息快照（boot 时确定），供 get_system_info 工具消费。
+ * 与 fs / shell 能力无关：这些路径只用于「告诉用户在哪」，不授予任何读写权限。
+ */
+export interface SystemInfo {
+  appVersion: string
+  /** 应用安装目录；开发态为项目根。 */
+  installDir: string
+  /** 配置目录（models / tools / system 等 JSON）。 */
+  settingsDir: string
+  /** 会话日志目录。 */
+  sessionsDir: string
+  /** 文件工具沙箱根，同时是 shell 的工作目录。 */
+  workingDir: string
+  platform: string
+  arch: string
+  electronVersion: string
+  nodeVersion: string
 }
 
 // —— Tool 运行时上下文 ——
@@ -52,7 +75,20 @@ export interface ReferenceReaderApi {
   /** 读文本；缺失或非文本返回 null。 */
   readText(path: string): Promise<string | null>
   /** 读图片字节（base64 + mime）；缺失返回 null。 */
-  readImage(path: string): Promise<{ mime: string; data: string } | null>
+  readImage2B64(path: string): Promise<{ mime: string; data: string } | null>
+}
+
+/**
+ * 模型需求：调用方声明「要什么能力」，不关心最终是哪个模型。
+ *
+ * 类别与输入模态缺一不可：
+ *   - category 区分用途——language 可对话/理解，image/audio/video 是对应模态的生成模型；
+ *   - inputModality 排除看不见/听不到的模型——同为 language，文本模型读不了图。
+ * 例：理解图片 = { category: 'language', inputModality: 'image' }；只按 category 会误取生成模型。
+ */
+export interface ModelRequirement {
+  category: ModelCategory
+  inputModality: Modality
 }
 
 export interface ToolRunContext {
@@ -64,10 +100,17 @@ export interface ToolRunContext {
   shell?: ToolShellApi
   /** 工具注册表只读视图 —— 供 query_capabilities 等元工具枚举可用能力。 */
   tools: ToolRegistry
-  /** 按类别挑选一个可用模型的 modelId（读取最新模型配置）；无匹配返回 undefined。 */
-  pickModel(category: ModelCategory): Promise<string | undefined>
+  /** 按需求挑选一个可用模型的 modelId（读取最新模型配置）；无匹配返回 undefined。 */
+  pickModel(requirement: ModelRequirement): Promise<string | undefined>
   /** 参考文件读取能力（任意绝对路径）；未注入时为 undefined。 */
   referenceReader?: ReferenceReaderApi
+  /**
+   * 覆盖写保护：本会话是否已通过 read_file 成功读过该绝对路径。
+   * 记录来自会话事件日志，由组合根注入；未注入时不启用保护。
+   */
+  hasReadFile?: (absolutePath: string) => Promise<boolean>
+  /** 应用自身信息；未注入时为 undefined。 */
+  systemInfo?: SystemInfo
 }
 
 // —— Tool 定义 ——
@@ -80,8 +123,6 @@ export interface Tool {
   description: string
   /** JSON Schema，描述 args 的形状；LLM 按此生成参数。 */
   parameters: Record<string, unknown>
-  /** 可选：tool 内部运行时偏好的模型类别（如内部要调多模态模型识别图片，可声明 'image'）。 */
-  preferredModelCategory?: ModelCategory
   /** 用户能否禁用此工具；false = 框架级工具，始终启用。默认 true。 */
   disableable?: boolean
   /** 用户能否修改 favorite；false = favorite 由框架固定（见 fixedFavorite）。默认 true。 */
@@ -131,8 +172,6 @@ export interface ToolCatalogItem {
   disableable: boolean
   /** 用户能否修改 favorite。 */
   favoriteEditable: boolean
-  /** 是否声明了 preferredModelCategory。 */
-  preferredModelCategory?: ModelCategory
 }
 
 export interface ToolCatalog {

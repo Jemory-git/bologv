@@ -4,9 +4,10 @@
  */
 
 import { join } from 'node:path'
-import { SETTINGS_DIR, readJsonFile, writeJsonFile } from './internal.ts'
+import { APP_PATHS } from '../paths.ts'
+import { readJsonFile, writeJsonFile } from './json-file.ts'
 
-const PLUGINS_FILE = join(SETTINGS_DIR, 'plugins.json')
+const PLUGINS_FILE = join(APP_PATHS.settingsDir, 'plugins.json')
 
 export interface PluginSettings {
   /** 可切换插件 id 列表；不包含 fixed 插件。 */

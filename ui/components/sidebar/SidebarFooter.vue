@@ -2,7 +2,7 @@
   /**
    * 侧边栏底部：设置按钮 + 弹出面板。
    *
-   * 面板目前包含两个入口，点击后切换到对应配置视图（待实现）。
+   * 面板是各类配置的入口，点击后由 App 打开对应模态窗。
    * 弹出层用纯 CSS 定位，点击外部自动关闭。
    */
   import { onMounted, onUnmounted, ref } from 'vue'
@@ -34,12 +34,14 @@
   const emit = defineEmits<{
     (e: 'open-model'): void
     (e: 'open-tools'): void
+    (e: 'open-workspace'): void
   }>()
 
   function handleItem(name: string): void {
     open.value = false
     if (name === 'model') emit('open-model')
     else if (name === 'tools') emit('open-tools')
+    else if (name === 'workspace') emit('open-workspace')
     // TODO: system prompt 配置
   }
 </script>
@@ -58,6 +60,9 @@
       </button>
       <button type="button" class="item" role="menuitem" @click="handleItem('tools')">
         配置工具
+      </button>
+      <button type="button" class="item" role="menuitem" @click="handleItem('workspace')">
+        配置工作目录
       </button>
       <button type="button" class="item" role="menuitem" @click="handleItem('system')">
         配置 System Prompt

@@ -6,7 +6,7 @@
  * 这是「模型可见 ⟺ 已记录」的后半句。
  */
 
-import type { ChatContentPart, ChatMessage } from '@pkg/llm'
+import type { ChatContentPart, ChatMessage } from '@pkg/models/language/types.ts'
 import { referenceLabels } from '@pkg/session'
 import type { ReferenceMeta, SessionEvent } from '@pkg/session'
 
@@ -21,14 +21,21 @@ export function toChatMessages(events: readonly SessionEvent[], imageEmbeds: Ima
         messages.push({ role: 'user', content: toUserContent(event.text, event.references, imageEmbeds) })
         break
       case 'assistant/message':
-        messages.push({ role: 'assistant', content: event.text })
+        messages.push({
+          role: 'assistant',
+          content: event.text,
+          ...(event.providerState !== undefined ? { providerState: event.providerState } : {}),
+        })
         break
       case 'tool/call': {
         // 同一轮的连续调用合并为一条 assistant 消息，
         // 对应 provider 协议里 assistant.tool_calls 数组。
+        // 携带信封的空文本 assistant 事件也参与合并（信封与调用同属一轮）；
+        // 无信封的普通文本消息不吸收 call，保证旧日志投影行为不变。
         const call = { id: event.callId, name: event.name, args: event.args }
         const last = messages.at(-1)
-        if (last?.role === 'assistant' && last.toolCalls !== undefined) {
+        if (last?.role === 'assistant' && (last.toolCalls !== undefined || last.providerState !== undefined)) {
+          if (last.toolCalls === undefined) last.toolCalls = []
           last.toolCalls.push(call)
         } else {
           messages.push({ role: 'assistant', content: '', toolCalls: [call] })

@@ -3,13 +3,14 @@
  */
 
 import { join } from 'node:path'
-import { ModelNotFoundError } from '@pkg/llm'
-import { isModality, isModelCategory } from '@pkg/llm/types.ts'
-import { SETTINGS_DIR, readJsonFile, writeJsonFile } from './internal.ts'
+import { ModelNotFoundError } from '@pkg/models'
+import { isModality, isModelCategory, isProtocol } from '@pkg/models/types.ts'
+import { APP_PATHS } from '../paths.ts'
+import { readJsonFile, writeJsonFile } from './json-file.ts'
 
-import type { Modality, ModelDef, Vendor } from '@pkg/llm/types.ts'
+import type { Modality, ModelDef, Vendor } from '@pkg/models/types.ts'
 
-const MODELS_FILE = join(SETTINGS_DIR, 'models.json')
+const MODELS_FILE = join(APP_PATHS.settingsDir, 'models.json')
 
 const DEFAULT_VENDORS: Vendor[] = [
   {
@@ -22,6 +23,7 @@ const DEFAULT_VENDORS: Vendor[] = [
         id: 'model-chat',
         modelId: 'deepseek-chat',
         path: '/chat/completions',
+        protocol: 'openai-chat',
         category: 'language',
         inputModalities: ['text'],
       },
@@ -29,6 +31,7 @@ const DEFAULT_VENDORS: Vendor[] = [
         id: 'model-reasoner',
         modelId: 'deepseek-reasoner',
         path: '/chat/completions',
+        protocol: 'openai-chat',
         category: 'language',
         inputModalities: ['text'],
       },
@@ -59,7 +62,7 @@ export async function findModelDef(modelId: string): Promise<ModelDef> {
 // —— 形状校验 ——
 // PUT 边界与 models.json 读取共用这份规则，与前端 ModelModal.validate 对齐：
 // 至少一个厂商、必填字段非空（去首尾空白）、path 以 / 开头、id / modelId 唯一；
-// 模型类别合法，输入模态非空、无未知值、无重复项。
+// 模型协议与类别合法，输入模态非空、无未知值、无重复项。
 // 校验失败抛错，由调用方决定语义。
 
 export function parseVendors(raw: unknown): Vendor[] {
@@ -105,6 +108,10 @@ function parseModel(raw: unknown, field: string): ModelDef {
   if (!path.startsWith('/')) {
     throw new Error(`${field}.path must start with "/"`)
   }
+  const protocol = m.protocol
+  if (!isProtocol(protocol)) {
+    throw new Error(`${field}.protocol is invalid`)
+  }
   const category = m.category
   if (!isModelCategory(category)) {
     throw new Error(`${field}.category is invalid`)
@@ -113,6 +120,7 @@ function parseModel(raw: unknown, field: string): ModelDef {
     id: asString(m.id, `${field}.id`),
     modelId: asString(m.modelId, `${field}.modelId`),
     path,
+    protocol,
     category,
     inputModalities: asInputModalities(m.inputModalities, `${field}.inputModalities`),
   }

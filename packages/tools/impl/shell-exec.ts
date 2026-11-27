@@ -8,11 +8,12 @@ import type { ToolFactory } from '../types.ts'
 
 export const shellExec: ToolFactory = (ctx) => ({
   name: 'shell_exec',
-  description: '执行 shell 命令并返回 stdout/stderr 与 exit code。适合构建、安装依赖、运行测试等。',
+  description:
+    '执行 shell 命令并返回 exit code、stdout、stderr。整条命令交给系统 shell 解释，支持管道、重定向、&& 与带引号的参数。适合构建、运行脚本、安装依赖、运行测试等。非零 exit code 表示命令执行失败，请读 stderr 判断原因。',
   parameters: {
     type: 'object',
     properties: {
-      command: { type: 'string', description: '要执行的命令（不支持管道、重定向等 shell 语法）' },
+      command: { type: 'string', description: '要执行的完整命令，如 "python --version"、"ls -la | head"' },
       timeoutMs: { type: 'integer', description: '可选。超时毫秒数（默认 30000）' },
     },
     required: ['command'],

@@ -1,7 +1,7 @@
 /**
  * 外置插件目录：扫描 + manifest 校验 + 首次安装示例。
  *
- * 目录约定（userData/plugins/<id>/）：
+ * 目录约定（APP_PATHS.userPluginsDir，即 userData/plugins/<id>/）：
  *   manifest.json  元信息；扫描阶段只读它，不执行插件代码
  *   main.js        入口；仅在启用时由渲染进程动态 import
  *
@@ -10,22 +10,16 @@
 
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { app } from 'electron'
+import { APP_PATHS } from '../paths.ts'
 import type { Dirent } from 'node:fs'
 import type { ExternalPluginInfo, ExternalPluginIssue, ExternalPluginsResponse } from '../../shared/dto.ts'
-
-/** 源码里的示例插件目录；打包后位于 asar 内。 */
-const SOURCE_DIR = join(app.getAppPath(), 'resources', 'plugins')
-
-/** 用户自行安装的插件目录。 */
-const USER_DIR = join(app.getPath('userData'), 'plugins')
 
 /**
  * 外置插件根目录。
  * 开发模式直接读源码目录：主进程监听其变化并通知 UI 重载，无需复制或手动同步；
  * 生产模式读 userData：安装目录只读，用户安装的插件只能落在用户数据里。
  */
-export const PLUGINS_DIR = process.env.NODE_ENV === 'production' ? USER_DIR : SOURCE_DIR
+export const EXTERNAL_PLUGINS_DIR = process.env.NODE_ENV === 'production' ? APP_PATHS.userPluginsDir : APP_PATHS.bundledPluginsDir
 
 const MANIFEST_FILE = 'manifest.json'
 const DEFAULT_ENTRY = 'main.js'
@@ -50,9 +44,9 @@ export async function scanExternalPlugins(): Promise<ExternalPluginsResponse> {
 
   let entries: Dirent[]
   try {
-    entries = await readdir(PLUGINS_DIR, { withFileTypes: true })
+    entries = await readdir(EXTERNAL_PLUGINS_DIR, { withFileTypes: true })
   } catch {
-    return { dir: PLUGINS_DIR, plugins, broken }
+    return { dir: EXTERNAL_PLUGINS_DIR, plugins, broken }
   }
 
   for (const entry of entries) {
@@ -64,7 +58,7 @@ export async function scanExternalPlugins(): Promise<ExternalPluginsResponse> {
 
   plugins.sort((a, b) => a.id.localeCompare(b.id))
   broken.sort((a, b) => a.dir.localeCompare(b.dir))
-  return { dir: PLUGINS_DIR, plugins, broken }
+  return { dir: EXTERNAL_PLUGINS_DIR, plugins, broken }
 }
 
 type ManifestRead =
@@ -76,7 +70,7 @@ async function readManifest(dirName: string): Promise<ManifestRead> {
     return { ok: false, reason: '目录名须为 2-32 位小写字母/数字/连字符，并以字母开头' }
   }
 
-  const path = join(PLUGINS_DIR, dirName, MANIFEST_FILE)
+  const path = join(EXTERNAL_PLUGINS_DIR, dirName, MANIFEST_FILE)
   let text: string
   try {
     text = await readFile(path, 'utf-8')
@@ -142,7 +136,7 @@ function ensureSeeded(): Promise<void> {
 
 async function seed(): Promise<void> {
   try {
-    await readdir(PLUGINS_DIR)
+    await readdir(EXTERNAL_PLUGINS_DIR)
     return // 目录已存在：用户已接管，不覆盖、也不复活被删掉的插件
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return
@@ -150,13 +144,13 @@ async function seed(): Promise<void> {
 
   let names: string[]
   try {
-    names = await readdir(SOURCE_DIR)
+    names = await readdir(APP_PATHS.bundledPluginsDir)
   } catch {
     return // 精简单文件构建里没有示例资源：跳过
   }
 
   for (const name of names) {
-    await copyTree(join(SOURCE_DIR, name), join(PLUGINS_DIR, name))
+    await copyTree(join(APP_PATHS.bundledPluginsDir, name), join(EXTERNAL_PLUGINS_DIR, name))
   }
 }
 

@@ -2,7 +2,7 @@
  * query_capabilities —— 目录浏览元工具。
  *
  * 和其他 tool 一样是普通工厂，无特殊构造：通过 ctx.tools（注册表只读视图）枚举能力，
- * 正如 search_file 通过 ctx.fs 访问文件系统。
+ * 正如 grep_files 通过 ctx.fs 访问文件系统。
  *
  * LLM 用它发现当前环境有哪些可用能力。filter 为空返回全部非 favorite 工具；
  * 有值时按关键词过滤。语义理解由 LLM 自己完成（读 description 后推理），服务端只做关键词匹配。
@@ -40,7 +40,7 @@ export const queryCapabilities: ToolFactory = (ctx) => ({
     // 完整 schema 由 agent-loop 下一轮随 tools 参数下发，不在结果里重复。
     const content =
       names.length > 0
-        ? `已检索到 ${names.length} 个工具（${names.join('、')}），下一轮起可直接调用。`
+        ? `已检索到 ${names.length} 个工具（${names.join('、')}），下一轮起可直接调用。命中仅表示关键词相关，是否满足需求请核对工具描述；没有合适的就如实告诉用户不具备该能力。`
         : '未检索到匹配的工具。可换更短、更泛的关键词（如 "file"、"image"）重试，或留空 filter 查看全部可激活工具。'
     return {
       content,

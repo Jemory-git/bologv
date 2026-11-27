@@ -25,7 +25,10 @@ export function factsFromEvents(
   for (const event of events) {
     lastActive = event.ts
     if (firstUserText === null && event.type === 'user/message') firstUserText = event.text
-    if (event.type === 'user/message' || event.type === 'assistant/message') lastPreview = event.text
+    // 空文本 assistant 事件仅携带推理信封，不作为列表预览。
+    if (event.type === 'user/message' || (event.type === 'assistant/message' && event.text !== '')) {
+      lastPreview = event.text
+    }
   }
 
   return { id, title, firstUserText, lastPreview, lastActive }

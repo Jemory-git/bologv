@@ -7,7 +7,7 @@
  *   - 其余未知异常     → HTTP 500 + { error } 直出（UI 公共错误通道）
  */
 
-import { LLMConfigError, LLMResponseError } from '@pkg/llm'
+import { LLMConfigError, LLMResponseError } from '@pkg/models'
 import { StorageError } from '@pkg/session'
 import { AppError } from '../errors.ts'
 import type { Next } from 'koa'

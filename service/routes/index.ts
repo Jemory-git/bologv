@@ -9,7 +9,7 @@ import type Router from '@koa/router'
 import type { Booted } from '../../boot.ts'
 import { healthRouter } from './health.ts'
 import { modelsRouter } from './models.ts'
-import { pluginsRouter } from './plugins.ts'
+import { externalPluginsRouter } from './external-plugins.ts'
 import { referencesRouter } from './references.ts'
 import { settingsRouter } from './settings.ts'
 import { createChatRouter } from './chat.ts'
@@ -21,7 +21,7 @@ export function registerApiRoutes(router: Router, bootedPromise: Promise<Booted>
   router.use('/references', referencesRouter.routes())
   router.use('/chat', createChatRouter(bootedPromise).routes())
   router.use('/models', modelsRouter.routes())
-  router.use('/plugins', pluginsRouter.routes())
+  router.use('/external-plugins', externalPluginsRouter.routes())
   router.use('/settings', settingsRouter.routes())
   router.use('/sessions', createSessionsRouter(bootedPromise).routes())
   router.use('/tools', createToolsRouter(bootedPromise).routes())

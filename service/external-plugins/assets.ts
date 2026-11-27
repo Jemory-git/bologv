@@ -7,7 +7,7 @@
 
 import { stat } from 'node:fs/promises'
 import { extname, isAbsolute, join, relative, resolve } from 'node:path'
-import { PLUGINS_DIR, isValidPluginId } from './catalog.ts'
+import { EXTERNAL_PLUGINS_DIR, isValidPluginId } from './catalog.ts'
 
 export interface PluginAsset {
   path: string
@@ -29,7 +29,7 @@ export async function resolvePluginAsset(id: string, file: string): Promise<Plug
   const type = MIME[extname(file).toLowerCase()]
   if (type === undefined) return null
 
-  const base = join(PLUGINS_DIR, id)
+  const base = join(EXTERNAL_PLUGINS_DIR, id)
   const target = resolve(base, file)
   const rel = relative(base, target)
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null

@@ -1,22 +1,21 @@
 /**
- * storage 内部通用工具：JSON 文件读写。
- * 所有存储模块共享。
+ * JSON 文件原语：原子写 + 损坏隔离读取。
+ *
+ * 供 service/storage 下的各配置文件模块复用（models / tools / plugins / system）。
+ * 路径由调用方给出——本模块不关心配置目录在哪，目录布局见 service/paths.ts。
  *
  * 崩溃安全：写入走「临时文件 + rename」原子替换，读者永远看不到半截内容；
  * 读取遇到损坏（解析失败或形状不符）时隔离原件并回退默认值，不阻塞启动。
  */
 
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { app } from 'electron'
-
-export const SETTINGS_DIR = join(app.getPath('userData'), 'settings')
+import { dirname } from 'node:path'
 
 /** 临时文件后缀序号：pid + 自增序号，并发写同一文件时互不覆盖临时文件。 */
 let tmpSeq = 0
 
-async function ensureDir(): Promise<void> {
-  await mkdir(SETTINGS_DIR, { recursive: true })
+async function ensureDir(path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true })
 }
 
 /**
@@ -47,7 +46,7 @@ export async function readJsonFile<T>(path: string, fallback: T, parse?: (raw: u
 
 /** 原子写：先写同目录临时文件，再 rename 替换。 */
 export async function writeJsonFile<T>(path: string, data: T): Promise<void> {
-  await ensureDir()
+  await ensureDir(path)
   const tmp = `${path}.${process.pid}.${++tmpSeq}.tmp`
   try {
     await writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8')
